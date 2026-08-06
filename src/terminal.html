@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A. - Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header id="hud-header">
+    <div class="header-left">
+      <span class="system-status-indicator blink"></span>
+      <span class="system-title">S.A.V.I.A</span>
+      <span class="system-version">v4.0.0</span>
+    </div>
+
+    <div class="header-center">
+      <span class="breadcrumb">SYSTEM_ROOT // COMMAND_CENTER // FILE_OPS_TERMINAL</span>
+    </div>
+
+    <div class="header-right">
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <div class="window-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
+        <button class="win-btn" id="btn-close" title="Close">&#10005;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app-workspace">
+
+    <aside id="left-sidebar">
+      <div class="nav-rail-header">
+        <div class="nav-rail-logo"><i class="fas fa-brain"></i></div>
+        <span class="nav-rail-title">S.A.V.I.A NAV</span>
+      </div>
+      <div class="nav-rail-items">
+        <div class="nav-rail-section-label">CORE</div>
+        <div class="nav-rail-item" onclick="window.location.href='index.html'">
+          <div class="nav-icon"><i class="fas fa-terminal"></i></div>
+          <div class="nav-label"><span class="nav-label-main">COGNITIVE_TERMINAL</span><span class="nav-label-sub">AI Chat HUD</span></div>
+        </div>
+        <div class="nav-rail-item active">
+          <div class="nav-icon"><i class="fas fa-folder-open"></i></div>
+          <div class="nav-label"><span class="nav-label-main">COMMAND_CENTER</span><span class="nav-label-sub">File Explorer &amp; Terminal</span></div>
+        </div>
+        <div class="nav-rail-divider"></div>
+        <div class="nav-rail-section-label">MODULES</div>
+        <div class="nav-rail-item" onclick="window.location.href='calendar.html'">
+          <div class="nav-icon"><i class="fas fa-calendar-alt"></i></div>
+          <div class="nav-label"><span class="nav-label-main">CALENDAR</span><span class="nav-label-sub">Events &amp; Schedule</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='objectives.html'">
+          <div class="nav-icon"><i class="fas fa-bullseye"></i></div>
+          <div class="nav-label"><span class="nav-label-main">OBJECTIVES_HUB</span><span class="nav-label-sub">Goals &amp; Daily Log</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='imagine.html'">
+          <div class="nav-icon"><i class="fas fa-palette"></i></div>
+          <div class="nav-label"><span class="nav-label-main">AI_IMAGINE</span><span class="nav-label-sub">Text to Image</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='particles.html'">
+          <div class="nav-icon"><i class="fas fa-atom"></i></div>
+          <div class="nav-label"><span class="nav-label-main">NEURAL_PARTICLES</span><span class="nav-label-sub">3D Gesture Creator</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='globe.html'">
+          <div class="nav-icon"><i class="fas fa-globe"></i></div>
+          <div class="nav-label"><span class="nav-label-main">GLOBAL_TIMELINE</span><span class="nav-label-sub">World Time &amp; Weather</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='knowledge.html'">
+          <div class="nav-icon"><i class="fas fa-database"></i></div>
+          <div class="nav-label"><span class="nav-label-main">KNOWLEDGE_BASE</span><span class="nav-label-sub">RAG Document Store</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
+          <div class="nav-icon"><i class="fab fa-youtube"></i></div>
+          <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
+        </div>
+      </div>
+      <div class="nav-rail-footer">
+        <div class="nav-rail-item" style="opacity:0.4;cursor:default;">
+          <div class="nav-icon"><i class="fas fa-shield-alt"></i></div>
+          <div class="nav-label"><span class="nav-label-main">SECURE SHELL</span><span class="nav-label-sub">127.0.0.1</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <section id="central-core-container">
+
+      <div class="view-panel flex-grow">
+        <div class="commander-split">
+          <div id="commander-filebrowser" class="hud-panel flex-grow-column">
+            <div class="panel-header">
+              <h2>FILE_EXPLORER</h2>
+              <span class="sub-header-telemetry" id="fb-status">0 items</span>
+            </div>
+            <div class="fb-toolbar">
+              <button class="fb-btn" id="fb-back" title="Back"><i class="fas fa-chevron-left"></i></button>
+              <button class="fb-btn" id="fb-forward" title="Forward"><i class="fas fa-chevron-right"></i></button>
+              <button class="fb-btn" id="fb-up" title="Up"><i class="fas fa-chevron-up"></i></button>
+              <button class="fb-btn" id="fb-refresh" title="Refresh"><i class="fas fa-sync-alt"></i></button>
+              <button class="fb-btn" id="fb-select-dir" title="Select Directory"><i class="fas fa-folder-open"></i></button>
+              <button class="fb-btn" id="fb-scan-btn" title="Smart File Scanner"><i class="fas fa-microchip"></i></button>
+              <div class="fb-path-bar">
+                <span class="fb-path-text" id="fb-path-text">COMPUTER</span>
+              </div>
+            </div>
+            <div class="panel-content scrollable" id="fb-content">
+              <div id="fb-list"></div>
+            </div>
+            <div class="panel-footer">
+              <span class="footer-telemetry" id="fb-footer-text">READY</span>
+            </div>
+          </div>
+
+          <div id="commander-terminal" class="hud-panel flex-grow-column">
+            <div class="panel-header">
+              <h2>TERMINAL</h2>
+              <div class="term-header-actions">
+                <span class="sub-header-telemetry" id="term-status">IDLE</span>
+                <button class="fb-btn" id="term-clear" title="Clear Output"><i class="fas fa-trash-alt"></i></button>
+                <button class="fb-btn" id="term-kill" title="Kill Running Command"><i class="fas fa-stop"></i></button>
+              </div>
+            </div>
+            <div class="panel-content" id="term-content">
+              <div id="term-output" class="scrollable"></div>
+            </div>
+            <div class="term-input-area">
+              <span class="term-cwd-label" id="term-cwd">C:\</span>
+              <form id="terminal-command-form">
+                <input type="text" id="term-input" autocomplete="off" placeholder="Enter command..." />
+                <button type="submit" id="term-submit">RUN</button>
+              </form>
+            </div>
+          </div>
+
+          <div id="commander-scanner" class="hud-panel flex-grow-column hidden">
+            <div class="panel-header">
+              <h2>FILE_SCANNER</h2>
+              <div class="term-header-actions">
+                <span class="sub-header-telemetry" id="scan-status">READY</span>
+                <button class="fb-btn" id="scan-describe-all" title="Describe All Files"><i class="fas fa-file-alt"></i></button>
+                <button class="fb-btn" id="scan-close" title="Close Scanner"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <div class="panel-content scrollable" id="scan-results">
+              <div class="scan-info">Navigate to a folder and click <i class="fas fa-microchip"></i> to scan. Then press <i class="fas fa-file-alt"></i> to describe each file with AI.</div>
+            </div>
+            <div class="panel-footer">
+              <span class="footer-telemetry" id="scan-footer-text">IDLE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <aside id="right-sidebar" class="hud-panel">
+      <!-- Clock Panel at the top of the right sidebar -->
+      <div class="sidebar-subview" style="padding: 15px; border-bottom: 1px solid rgba(0, 243, 255, 0.1); text-align: center;">
+        <div class="panel-header" style="border: none; padding: 0 0 5px 0; justify-content: center;">
+          <h2 style="font-size: 11px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.4); text-transform: uppercase;">REALTIME_LIVE_CLOCK</h2>
+        </div>
+        <div id="clock-display">00:00:00</div>
+      </div>
+
+      <div id="sidebar-telemetry-container" class="sidebar-subview flex-grow-column">
+        <div class="panel-header">
+          <h2>TELEMETRY_DIAGS</h2>
+          <span class="sub-header-telemetry">REFRESH: LIVE</span>
+        </div>
+
+        <div class="panel-content scrollable">
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>NEURAL CORE LOAD</span>
+              <span id="txt-cpu-load">0%</span>
+            </div>
+            <div class="progress-gauge">
+              <div class="gauge-fill neon-cyan-glow" id="fill-cpu" style="width: 0%"></div>
+            </div>
+            <div class="micro-stats">AVG: 18.4% // PEAK: 46.2%</div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>MEMORY CONSUMPTION</span>
+              <span id="txt-mem-load">0 GB</span>
+            </div>
+            <div class="progress-gauge">
+              <div class="gauge-fill neon-purple-glow" id="fill-mem" style="width: 0%"></div>
+            </div>
+            <div class="micro-stats">TOTAL AVAILABLE: 16.00 GB</div>
+          </div>
+
+          <div class="ticker-box" id="system-logs-ticker">
+            <div class="ticker-title">REALTIME_EVENT_LOG <span class="click-hint">// CLICK TO OPEN</span></div>
+            <div class="ticker-content" id="ticker-events">
+              <div class="ticker-item">[SYS] Active memory registers initialized.</div>
+              <div class="ticker-item">[SYS] Listening on IPC render-frame channels.</div>
+            </div>
+          </div>
+
+          <div class="hud-control-group">
+            <h3>SYSTEM MODES</h3>
+            <button class="hud-action-btn active" id="btn-overclock">
+              <span class="indicator green"></span> OVERCLOCK STATE
+            </button>
+            <button class="hud-action-btn" id="btn-sound">
+              <span class="indicator green"></span> SONIC SOUND EFFECTS
+            </button>
+            <button class="hud-action-btn" id="btn-scanlines">
+              <span class="indicator green"></span> GRAPHICAL SCANLINES
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-footer">
+        <span class="footer-telemetry">SYS_FREQ: 60FPS // BUFFERS: STABLE</span>
+      </div>
+    </aside>
+
+  </main>
+
+  <div id="hud-scanlines"></div>
+
+  <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
+  <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="auto"></audio>
+
+  <div id="logs-modal" class="hidden-modal">
+    <div id="logs-modal-content" class="hud-panel-flat">
+      <header class="modal-header">
+        <div class="modal-title-left">
+          <span class="system-status-indicator blink"></span>
+          <span class="modal-title-text">SYSTEM_LOGS_CONSOLE</span>
+        </div>
+        <div class="modal-header-right">
+          <span id="modal-clock">00:00:00</span>
+          <button id="btn-close-modal" class="modal-close-btn"><i class="fas fa-times"></i></button>
+        </div>
+      </header>
+
+      <section class="modal-toolbar">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all">ALL_LOGS</button>
+          <button class="filter-btn" data-filter="sys">SYS</button>
+          <button class="filter-btn" data-filter="particles">PARTICLES</button>
+          <button class="filter-btn" data-filter="ollama">OLLAMA</button>
+          <button class="filter-btn" data-filter="warn">ALERTS</button>
+        </div>
+        <div class="modal-telemetry">
+          LOGS_COUNT: <span id="modal-logs-count">0</span>
+        </div>
+      </section>
+
+      <main id="modal-logs-body" class="scrollable">
+        <div id="modal-logs-list"></div>
+      </main>
+
+      <footer class="modal-footer-box">
+        <div class="footer-left">
+          <span>SECURE CORE LOGGER // 127.0.0.1</span>
+        </div>
+        <div class="footer-right">
+          <button id="btn-clear-modal-logs" class="hud-action-btn-danger">
+            <span class="indicator red"></span> CLEAR LOGS BUFFER
+          </button>
+          <button id="btn-close-modal-footer" class="hud-action-btn-primary">
+            DISMISS CONSOLE
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="hidden-modal">
+    <div id="confirm-modal-content" class="hud-panel-flat">
+      <div class="modal-header">
+        <div class="modal-title-left">
+          <span class="system-status-indicator blink"></span>
+          <span class="modal-title-text" id="confirm-title">CONFIRM_ACTION</span>
+        </div>
+      </div>
+      <div class="confirm-body">
+        <p id="confirm-message">Are you sure?</p>
+      </div>
+      <footer class="modal-footer-box">
+        <div class="footer-right">
+          <button id="confirm-cancel" class="hud-action-btn-primary">CANCEL</button>
+          <button id="confirm-ok" class="hud-action-btn-danger">CONFIRM</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <div id="context-menu" class="hidden">
+    <div class="context-menu-item" id="ctx-rename">Rename</div>
+    <div class="context-menu-item" id="ctx-delete">Delete</div>
+    <div class="context-menu-item" id="ctx-copy-path">Copy Path</div>
+    <div class="context-menu-item" id="ctx-open-explorer">Open in Explorer</div>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="commander.js"></script>
+  <script src="telemetry.js"></script>
+
+<script>
+function openEditor() {
+  if (window.electronAPI?.openEditor) {
+    window.electronAPI.openEditor();
+  }
+}
+</script>
+</body>
+</html>

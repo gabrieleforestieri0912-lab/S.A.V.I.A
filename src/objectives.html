@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A. - Objectives Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header id="hud-header">
+    <div class="header-left">
+      <span class="system-status-indicator blink"></span>
+      <span class="system-title">S.A.V.I.A</span>
+      <span class="system-version">v4.0.0</span>
+    </div>
+
+    <div class="header-center">
+      <span class="breadcrumb">SYSTEM_ROOT // OBJECTIVES_HUB // NOTION_SYNC</span>
+    </div>
+
+    <div class="header-right">
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <div id="clock-display">00:00:00</div>
+      <div class="window-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
+        <button class="win-btn" id="btn-close" title="Close">&#10005;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app-workspace">
+
+    <aside id="left-sidebar">
+      <div class="nav-rail-header">
+        <div class="nav-rail-logo"><i class="fas fa-brain"></i></div>
+        <span class="nav-rail-title">S.A.V.I.A NAV</span>
+      </div>
+      <div class="nav-rail-items">
+        <div class="nav-rail-section-label">CORE</div>
+        <div class="nav-rail-item" onclick="window.location.href='index.html'">
+          <div class="nav-icon"><i class="fas fa-terminal"></i></div>
+          <div class="nav-label"><span class="nav-label-main">COGNITIVE_TERMINAL</span><span class="nav-label-sub">AI Chat HUD</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='terminal.html'">
+          <div class="nav-icon"><i class="fas fa-folder-open"></i></div>
+          <div class="nav-label"><span class="nav-label-main">COMMAND_CENTER</span><span class="nav-label-sub">File Explorer &amp; Terminal</span></div>
+        </div>
+        <div class="nav-rail-divider"></div>
+        <div class="nav-rail-section-label">MODULES</div>
+        <div class="nav-rail-item" onclick="window.location.href='calendar.html'">
+          <div class="nav-icon"><i class="fas fa-calendar-alt"></i></div>
+          <div class="nav-label"><span class="nav-label-main">CALENDAR</span><span class="nav-label-sub">Events &amp; Schedule</span></div>
+        </div>
+        <div class="nav-rail-item active">
+          <div class="nav-icon"><i class="fas fa-bullseye"></i></div>
+          <div class="nav-label"><span class="nav-label-main">OBJECTIVES_HUB</span><span class="nav-label-sub">Goals &amp; Daily Log</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='imagine.html'">
+          <div class="nav-icon"><i class="fas fa-palette"></i></div>
+          <div class="nav-label"><span class="nav-label-main">AI_IMAGINE</span><span class="nav-label-sub">Text to Image</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='particles.html'">
+          <div class="nav-icon"><i class="fas fa-atom"></i></div>
+          <div class="nav-label"><span class="nav-label-main">NEURAL_PARTICLES</span><span class="nav-label-sub">3D Gesture Creator</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='globe.html'">
+          <div class="nav-icon"><i class="fas fa-globe"></i></div>
+          <div class="nav-label"><span class="nav-label-main">GLOBAL_TIMELINE</span><span class="nav-label-sub">World Time &amp; Weather</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='knowledge.html'">
+          <div class="nav-icon"><i class="fas fa-database"></i></div>
+          <div class="nav-label"><span class="nav-label-main">KNOWLEDGE_BASE</span><span class="nav-label-sub">RAG Document Store</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
+          <div class="nav-icon"><i class="fab fa-youtube"></i></div>
+          <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
+        </div>
+      </div>
+      <div class="nav-rail-footer">
+        <div class="nav-rail-item" style="opacity:0.4;cursor:default;">
+          <div class="nav-icon"><i class="fas fa-shield-alt"></i></div>
+          <div class="nav-label"><span class="nav-label-main">SECURE SHELL</span><span class="nav-label-sub">127.0.0.1</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <section id="central-core-container">
+
+      <div class="view-panel flex-grow-column">
+
+        <div class="hud-panel-flat obj-banner">
+          <div class="obj-banner-content">
+            <div class="obj-banner-icon"><i class="fas fa-bullseye"></i></div>
+            <div class="obj-banner-text">
+              <div class="obj-banner-title">OBJECTIVES_HUB — GOALS & DAILY LOG</div>
+              <div class="obj-banner-sub">Gestisci obiettivi, traguardi e riepiloghi giornalieri.<br>Sincronizzato con <strong>Notion</strong> per persistenza cross-device.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="obj-layout">
+          <div class="obj-left hud-panel flex-grow-column">
+            <div class="panel-header">
+              <h2>SHORT-TERM GOALS</h2>
+              <span class="sub-header-telemetry"><i class="fas fa-bolt"></i> attivi</span>
+            </div>
+            <div class="panel-content scrollable" id="obj-short-term-list">
+              <div class="obj-empty">Nessun obiettivo a breve termine.</div>
+            </div>
+            <div class="obj-add-row">
+              <input type="text" id="obj-short-input" class="hud-input" placeholder="Nuovo obiettivo a breve termine..." />
+              <button class="hud-action-btn-primary obj-add-btn" id="obj-short-add"><i class="fas fa-plus"></i></button>
+            </div>
+          </div>
+
+          <div class="obj-center hud-panel flex-grow-column">
+            <div class="panel-header">
+              <h2>LONG-TERM GOALS</h2>
+              <span class="sub-header-telemetry"><i class="fas fa-rocket"></i> vision</span>
+            </div>
+            <div class="panel-content scrollable" id="obj-long-term-list">
+              <div class="obj-empty">Nessun obiettivo a lungo termine.</div>
+            </div>
+            <div class="obj-add-row">
+              <input type="text" id="obj-long-input" class="hud-input" placeholder="Nuovo obiettivo a lungo termine..." />
+              <button class="hud-action-btn-primary obj-add-btn" id="obj-long-add"><i class="fas fa-plus"></i></button>
+            </div>
+          </div>
+
+          <div class="obj-right hud-panel flex-grow-column">
+            <div class="panel-header">
+              <h2>DAILY SUMMARY</h2>
+              <span class="sub-header-telemetry" id="obj-daily-date"><i class="fas fa-calendar-day"></i> oggi</span>
+            </div>
+            <div class="panel-content flex-column-layout" style="gap:0;">
+              <div id="obj-daily-text" class="obj-daily-content scrollable flex-grow">Caricamento...</div>
+              <div class="obj-add-row" style="padding:8px;border-top:1px solid rgba(0,243,255,0.08);">
+                <input type="text" id="obj-daily-input" class="hud-input" placeholder="Aggiorna riepilogo giornaliero..." />
+                <button class="hud-action-btn-primary" id="obj-daily-save"><i class="fas fa-save"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-panel-flat obj-config">
+          <div class="obj-config-header" id="obj-config-toggle">
+            <i class="fas fa-cog"></i> NOTION API CONFIG <span class="obj-config-arrow"><i class="fas fa-chevron-down"></i></span>
+          </div>
+          <div class="obj-config-body" id="obj-config-body">
+            <div class="obj-config-row">
+              <div class="obj-config-field">
+                <label>Notion API Key</label>
+                <input type="password" id="obj-notion-key" class="hud-input" placeholder="ntn_..." />
+              </div>
+              <div class="obj-config-field">
+                <label>Goals Database ID</label>
+                <input type="text" id="obj-notion-db-goals" class="hud-input" placeholder="database_id_goals" />
+              </div>
+              <div class="obj-config-field">
+                <label>Daily Summary Database ID</label>
+                <input type="text" id="obj-notion-db-daily" class="hud-input" placeholder="database_id_daily" />
+              </div>
+            </div>
+            <div class="obj-config-actions">
+              <button class="hud-action-btn-primary" id="obj-notion-verify"><i class="fas fa-check"></i> VERIFICA CONNESSIONE</button>
+              <button class="hud-action-btn" id="obj-notion-save-config"><i class="fas fa-save"></i> SALVA CONFIG</button>
+            </div>
+            <div id="obj-notion-log" class="obj-notion-log"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <div id="hud-scanlines"></div>
+
+  <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
+  <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="auto"></audio>
+
+  <script src="shared.js"></script>
+  <script src="objectives.js"></script>
+</body>
+</html>

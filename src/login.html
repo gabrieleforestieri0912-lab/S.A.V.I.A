@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A. - Biometric Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="lib/face-api.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-primary);
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #login-main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding: 20px;
+      position: relative;
+    }
+
+    #login-main::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 50%, rgba(0,243,255,0.03) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .camera-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .camera-frame {
+      position: relative;
+      width: 480px;
+      height: 360px;
+      border: 1px solid rgba(0,243,255,0.25);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 0 30px rgba(0,243,255,0.08), inset 0 0 60px rgba(0,0,0,0.6);
+    }
+
+    .camera-frame::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,243,255,0.03) 0%, transparent 50%, rgba(0,243,255,0.03) 100%);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.85;
+      transform: scaleX(-1);
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .frame-corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: var(--accent-cyan);
+      border-style: solid;
+      border-width: 0;
+      z-index: 6;
+      filter: drop-shadow(0 0 4px var(--accent-cyan-glow));
+    }
+
+    .frame-corner.tl { top: 6px; left: 6px; border-top-width: 2px; border-left-width: 2px; }
+    .frame-corner.tr { top: 6px; right: 6px; border-top-width: 2px; border-right-width: 2px; }
+    .frame-corner.bl { bottom: 6px; left: 6px; border-bottom-width: 2px; border-left-width: 2px; }
+    .frame-corner.br { bottom: 6px; right: 6px; border-bottom-width: 2px; border-right-width: 2px; }
+
+    .scanline-overlay {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+      pointer-events: none;
+      z-index: 7;
+      opacity: 0.5;
+    }
+
+    .scan-bar {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+      box-shadow: 0 0 12px var(--accent-cyan-glow);
+      z-index: 4;
+      animation: scanMove 2.5s ease-in-out infinite;
+      opacity: 0.6;
+    }
+
+    @keyframes scanMove {
+      0% { top: 0; opacity: 0.2; }
+      50% { opacity: 0.8; }
+      100% { top: 100%; opacity: 0.2; }
+    }
+
+    .face-guide {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 120px;
+      height: 160px;
+      border: 1px dashed rgba(0,243,255,0.15);
+      border-radius: 40% / 50%;
+      z-index: 2;
+      pointer-events: none;
+      animation: guidePulse 3s ease-in-out infinite;
+    }
+
+    @keyframes guidePulse {
+      0%, 100% { border-color: rgba(0,243,255,0.1); box-shadow: 0 0 10px rgba(0,243,255,0.05); }
+      50% { border-color: rgba(0,243,255,0.25); box-shadow: 0 0 20px rgba(0,243,255,0.1); }
+    }
+
+    .info-panel {
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-panel .panel-title {
+      font-family: var(--font-hud);
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: rgba(255,255,255,0.3);
+      margin-bottom: 4px;
+    }
+
+    .info-card {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 4px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: all 0.3s;
+    }
+
+    .status-dot.idle { background: rgba(255,255,255,0.2); box-shadow: none; }
+    .status-dot.scanning { background: var(--accent-cyan); box-shadow: 0 0 10px var(--accent-cyan); animation: pulse-dot 1s infinite; }
+    .status-dot.success { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
+    .status-dot.error { background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    #statusMsg {
+      font-family: var(--font-hud);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent-cyan);
+      text-shadow: 0 0 5px var(--accent-cyan-glow);
+      flex: 1;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 1px;
+    }
+
+    .bar-label span:last-child {
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease, background 0.3s ease;
+      width: 0%;
+    }
+
+    .progress-fill.low { background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+    .progress-fill.medium { background: var(--accent-gold); box-shadow: 0 0 8px var(--accent-gold); }
+    .progress-fill.high { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+    .progress-fill.perfect { background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan-glow); }
+
+    .security-level {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(0,243,255,0.08);
+      border-radius: 4px;
+    }
+
+    .security-level .shield-icon {
+      font-size: 18px;
+      color: var(--accent-cyan);
+      filter: drop-shadow(0 0 4px var(--accent-cyan-glow));
+    }
+
+    .security-level .level-info {
+      flex: 1;
+    }
+
+    .security-level .level-name {
+      font-family: var(--font-hud);
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 1px;
+    }
+
+    .security-level .level-value {
+      font-family: var(--font-hud);
+      font-size: 13px;
+      color: var(--accent-cyan);
+      letter-spacing: 2px;
+      text-shadow: 0 0 5px var(--accent-cyan-glow);
+    }
+
+    .attempts-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+    }
+
+    .attempt-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.3s;
+    }
+
+    .attempt-dot.used { background: var(--accent-red); border-color: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+    .attempt-dot.remaining { background: rgba(0,243,255,0.1); border-color: rgba(0,243,255,0.2); }
+
+    .hud-decoration {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: rgba(255,255,255,0.1);
+      font-family: var(--font-hud);
+      pointer-events: none;
+    }
+
+    .bypass-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+
+    .bypass-section.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+.bypass-section .bypass-hint {
+       font-size: 9px;
+       color: rgba(255,255,255,0.25);
+       letter-spacing: 1px;
+       font-family: var(--font-hud);
+     }
+
+     .hud-action-btn-primary, .hud-action-btn {
+       background: transparent;
+       border: 1px solid var(--accent-cyan);
+       color: var(--accent-cyan);
+       padding: 8px 16px;
+       font-family: var(--font-hud);
+       font-size: 10px;
+       letter-spacing: 1px;
+       cursor: pointer;
+       transition: all 0.3s;
+       display: flex;
+       align-items: center;
+       gap: 6px;
+     }
+
+     .hud-action-btn-primary:hover {
+       background: var(--accent-cyan);
+       color: #000;
+       box-shadow: 0 0 15px var(--accent-cyan-glow);
+     }
+
+     .hud-action-btn:hover {
+       background: rgba(0,243,255,0.1);
+       box-shadow: 0 0 15px var(--accent-cyan-glow);
+     }
+
+     @media (max-width: 900px) {
+      #login-main { flex-direction: column; gap: 20px; }
+      .camera-frame { width: 360px; height: 270px; }
+      .info-panel { width: 360px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header id="hud-header">
+    <div class="header-left">
+      <span class="system-status-indicator blink"></span>
+      <span class="system-title">S.A.V.I.A</span>
+      <span class="system-version">v4.0.0</span>
+    </div>
+    <div class="header-center">AUTH_BIOMETRICA // RICONOSCIMENTO_FACCIALE</div>
+    <div class="header-right">
+      <span id="clock-display" style="font-size:14px;">00:00:00</span>
+      <div class="window-controls">
+        <button class="win-btn" id="btn-minimize">&#9472;</button>
+        <button class="win-btn" id="btn-maximize">&#9633;</button>
+        <button class="win-btn" id="btn-close">&#10005;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="login-main">
+
+    <div class="camera-section">
+      <div class="camera-frame">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div class="scan-bar"></div>
+        <div class="scanline-overlay"></div>
+        <div class="face-guide"></div>
+        <span class="frame-corner tl"></span>
+        <span class="frame-corner tr"></span>
+        <span class="frame-corner bl"></span>
+        <span class="frame-corner br"></span>
+      </div>
+      <div style="font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.15);font-family:var(--font-hud);">
+        <i class="fas fa-video" style="margin-right:4px;"></i> SENSORI OTTICI ATTIVI
+      </div>
+    </div>
+
+    <div class="info-panel">
+      <div class="panel-title">◆ STATO BIOMETRICO</div>
+
+      <div class="info-card">
+        <div class="status-row">
+          <span class="status-dot idle" id="statusDot"></span>
+          <span id="statusMsg">INIZIALIZZAZIONE MODULI BIOMETRICI...</span>
+        </div>
+      </div>
+
+      <div class="info-card" style="gap: 6px;">
+        <div class="bar-label">
+          <span>CONFIDENZA MATCH</span>
+          <span id="matchPercent">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="matchBar"></div>
+        </div>
+      </div>
+
+      <div class="security-level">
+        <i class="fas fa-shield-alt shield-icon"></i>
+        <div class="level-info">
+          <div class="level-name">SICUREZZA</div>
+          <div class="level-value" id="securityLevel">ALPHA-0</div>
+        </div>
+        <i class="fas fa-lock" style="color:rgba(255,255,255,0.15);font-size:16px;" id="lockIcon"></i>
+      </div>
+
+      <div class="attempts-row">
+        <span style="letter-spacing:1px;">TENTATIVI:</span>
+        <span id="attemptDots"></span>
+      </div>
+
+<div class="bypass-section" id="bypassSection">
+         <div class="bypass-hint">RICONOSCIMENTO NON DISPONIBILE?</div>
+         <button class="hud-action-btn-primary" id="btnBypass">
+           <i class="fas fa-key"></i> BYPASS MANUALE
+         </button>
+       </div>
+
+       <div class="bypass-section" id="resetSection">
+         <div class="bypass-hint">PROFILO NON RICONOSCIUTO?</div>
+         <button class="hud-action-btn" id="btnReset">
+           <i class="fas fa-sync-alt"></i> RESET PROFILO
+         </button>
+       </div>
+     </div>
+
+      <div class="hud-decoration">// AUTH_BIOMETRICA // RICONOSCIMENTO_FACCIALE_v2 // S.A.V.I.A </div>
+
+  </main>
+
+  <script src="login.js"></script>
+</body>
+</html>

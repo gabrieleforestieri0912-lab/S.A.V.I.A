@@ -1,0 +1,23 @@
+{
+  "name": "savia",
+  "version": "4.0.0",
+  "description": "S.A.V.I.A — Cognitive HUD & AI Assistant with Ollama, Notion sync, YouTube, and multi-agent routing",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "hud",
+    "jarvis",
+    "ollama"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0"
+  },
+  "dependencies": {
+    "@vladmandic/face-api": "^1.7.15"
+  }
+}

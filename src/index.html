@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A. - Cognitive HUD</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+
+  <header id="hud-header">
+    <div class="header-left">
+      <span class="system-status-indicator blink"></span>
+      <span class="system-title">S.A.V.I.A</span>
+      <span class="system-version">v4.0.0</span>
+    </div>
+
+    <div class="header-center">
+      <span class="breadcrumb">SYSTEM_ROOT // COGNITIVE_TERMINAL // BRIDGE_ACTIVE</span>
+    </div>
+
+    <div class="header-right">
+      <button id="btn-test-notif" class="notif-test-btn" title="Test Notification">&#9839;</button>
+      <div class="window-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
+        <button class="win-btn" id="btn-close" title="Close">&#10005;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app-workspace">
+
+    <aside id="left-sidebar">
+      <div class="nav-rail-header">
+        <div class="nav-rail-logo"><i class="fas fa-brain"></i></div>
+        <span class="nav-rail-title">S.A.V.I.A NAV</span>
+      </div>
+
+      <div class="nav-rail-items">
+        <div class="nav-rail-section-label">CORE</div>
+
+        <div class="nav-rail-item active" onclick="window.location.href='index.html'">
+          <div class="nav-icon"><i class="fas fa-terminal"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">COGNITIVE_TERMINAL</span>
+            <span class="nav-label-sub">AI Chat HUD</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='terminal.html'">
+          <div class="nav-icon"><i class="fas fa-folder-open"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">COMMAND_CENTER</span>
+            <span class="nav-label-sub">File Explorer & Terminal</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" id="nav-dashboard" onclick="showDashboardView();return false;">
+          <div class="nav-icon"><i class="fas fa-chart-line"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">DASHBOARD</span>
+            <span class="nav-label-sub">System Monitor</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" id="nav-editor" onclick="showEditorView()">
+          <div class="nav-icon"><i class="fas fa-code"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">CODE_EDITOR</span>
+            <span class="nav-label-sub">Monaco Code Editor</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-divider"></div>
+        <div class="nav-rail-section-label">MODULES</div>
+
+        <div class="nav-rail-item" onclick="window.location.href='calendar.html'">
+          <div class="nav-icon"><i class="fas fa-calendar-alt"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">CALENDAR</span>
+            <span class="nav-label-sub">Events & Schedule</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='objectives.html'">
+          <div class="nav-icon"><i class="fas fa-bullseye"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">OBJECTIVES_HUB</span>
+            <span class="nav-label-sub">Goals & Daily Log</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='imagine.html'">
+          <div class="nav-icon"><i class="fas fa-palette"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">AI_IMAGINE</span>
+            <span class="nav-label-sub">Text to Image</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='particles.html'">
+          <div class="nav-icon"><i class="fas fa-atom"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">NEURAL_PARTICLES</span>
+            <span class="nav-label-sub">3D Gesture Creator</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='globe.html'">
+          <div class="nav-icon"><i class="fas fa-globe"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">GLOBAL_TIMELINE</span>
+            <span class="nav-label-sub">World Time & Weather</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='knowledge.html'">
+          <div class="nav-icon"><i class="fas fa-database"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">KNOWLEDGE_BASE</span>
+            <span class="nav-label-sub">RAG Document Store</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
+          <div class="nav-icon"><i class="fab fa-youtube"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">YOUTUBE_CONTROL</span>
+            <span class="nav-label-sub">Video Search & Filter</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-rail-footer">
+        <div class="nav-rail-section-label">SERVICES</div>
+        <div class="nav-rail-item" id="svc-cognitive" style="cursor:default;">
+          <div class="nav-icon"><i class="fas fa-brain"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">COGNITIVE_CORE</span>
+            <span class="item-desc nav-label-sub">bridge checking...</span>
+          </div>
+          <span class="item-status offline" id="ollama-status-dot"></span>
+          <span class="nav-label-sub" id="ollama-status-text" style="font-size:8px;padding-left:4px;">off</span>
+        </div>
+        <div class="nav-rail-item" id="svc-telemetry" style="cursor:default;">
+          <div class="nav-icon"><i class="fas fa-chart-line"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">TELEMETRY</span>
+            <span class="item-desc nav-label-sub">waiting for push...</span>
+          </div>
+        </div>
+        <div class="nav-rail-item" id="svc-fileindexing" style="cursor:pointer;">
+          <div class="nav-icon"><i class="fas fa-folder-tree"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">FILE_INDEX</span>
+            <span class="item-desc nav-label-sub">Filesystem Watcher</span>
+          </div>
+        </div>
+        <div class="nav-rail-item" style="opacity:0.4;cursor:default;">
+          <div class="nav-icon"><i class="fas fa-shield-alt"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">SECURE SHELL</span>
+            <span class="nav-label-sub">127.0.0.1 // LOCKED</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section id="central-core-container">
+
+      <div id="view-terminal" class="view-panel flex-grow-column">
+        <div id="central-reactor-hud" class="hud-panel-flat">
+          <div class="reactor-outer-ring">
+            <svg class="reactor-svg" viewBox="0 0 200 200">
+              <circle class="ring ring-outer" cx="100" cy="100" r="85" />
+              <circle class="ring ring-segmented" cx="100" cy="100" r="70" stroke-dasharray="15 8" />
+              <circle class="ring ring-inner" cx="100" cy="100" r="55" stroke-dasharray="8 4" />
+              <g class="reactor-nodes">
+                <circle cx="100" cy="30" r="5" class="node" />
+                <circle cx="170" cy="100" r="5" class="node" />
+                <circle cx="100" cy="170" r="5" class="node" />
+                <circle cx="30" cy="100" r="5" class="node" />
+              </g>
+              <circle class="ring-core" cx="100" cy="100" r="22" />
+              <path d="M100 10V45 M100 155V190 M10 100H45 M155 100H190" stroke="rgba(0,243,255,0.4)" stroke-width="1.5" />
+            </svg>
+          </div>
+
+          <div class="reactor-status-overlay">
+            <div class="core-freq-label">STATO SINCRO COGNITIVA</div>
+            <div class="core-freq-value" id="system-bridge-status">CONNESSIONE PONTI...</div>
+            <div class="core-telemetry-text">FREQ: <span id="telemetry-freq">2.84</span> GHz // TEMP: <span id="telemetry-temp">42.5</span>°C</div>
+          </div>
+        </div>
+
+        <div id="chat-terminal-panel" class="hud-panel flex-grow">
+          <div class="panel-header">
+            <h2>TERMINALE_COGNITIVO</h2>
+            <span class="sub-header-telemetry" id="chat-model-info">INTELLIGENZA: OLLAMA // MISTRAL</span>
+            <div id="voice-chat-indicator">
+              <i class="fas fa-microphone vc-mic idle" id="chat-vc-mic"></i>
+              <span class="vc-label" id="chat-vc-label">VOICE</span>
+            </div>
+          </div>
+
+          <div class="panel-content flex-column-layout">
+            <div id="terminal-logs" class="scrollable">
+              <div class="log-message system">
+                <span class="log-timestamp">[18:34:53]</span>
+                <span class="log-sender">[SYS_INIT]:</span>
+                <span class="log-text">S.A.V.I.A. operative matrix initialized. Ready to connect local cognitive nodes.</span>
+              </div>
+              <div class="log-message system">
+                <span class="log-timestamp">[18:34:54]</span>
+                <span class="log-sender">[OLLAMA_BRIDGE]:</span>
+                <span class="log-text" id="initialization-log">Checking local cognitive bridge on http://localhost:11434...</span>
+              </div>
+            </div>
+
+            <div id="typing-indicator" class="hidden">
+              <span class="indicator-text">S.A.V.I.A is synthesizing response...</span>
+              <div class="progress-bar-container">
+                <div class="progress-bar-pulse"></div>
+              </div>
+            </div>
+
+            <form id="terminal-input-form">
+              <div class="input-glow-wrapper">
+                <span class="terminal-prompt">&gt;&gt;</span>
+                <input type="text" id="terminal-input" autocomplete="off" placeholder="Enter commands or request AI neural processing..." />
+                <button type="submit" id="btn-submit-cmd">
+                  <span class="btn-text">SEND</span>
+                  <span class="btn-glitch"></span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-dashboard" class="view-panel hidden">
+        <div class="dash-grid">
+          <div class="dash-gauge" data-metric="cpu">
+            <svg viewBox="0 0 140 140">
+              <circle class="dg-bg" cx="70" cy="70" r="55" />
+              <circle class="dg-fill" id="dg-cpu" cx="70" cy="70" r="55" />
+              <text class="dg-value" id="dg-cpu-val" x="70" y="60">0%</text>
+              <text class="dg-label" x="70" y="82">CPU</text>
+            </svg>
+          </div>
+          <div class="dash-gauge" data-metric="ram">
+            <svg viewBox="0 0 140 140">
+              <circle class="dg-bg" cx="70" cy="70" r="55" />
+              <circle class="dg-fill" id="dg-ram" cx="70" cy="70" r="55" />
+              <text class="dg-value" id="dg-ram-val" x="70" y="60">0 GB</text>
+              <text class="dg-label" x="70" y="82">RAM</text>
+            </svg>
+          </div>
+          <div class="dash-gauge" data-metric="gpu">
+            <svg viewBox="0 0 140 140">
+              <circle class="dg-bg" cx="70" cy="70" r="55" />
+              <circle class="dg-fill" id="dg-gpu" cx="70" cy="70" r="55" />
+              <text class="dg-value" id="dg-gpu-val" x="70" y="60">N/D</text>
+              <text class="dg-label" x="70" y="82">GPU</text>
+            </svg>
+          </div>
+          <div class="dash-gauge" data-metric="temp">
+            <svg viewBox="0 0 140 140">
+              <circle class="dg-bg" cx="70" cy="70" r="55" />
+              <circle class="dg-fill" id="dg-temp" cx="70" cy="70" r="55" />
+              <text class="dg-value" id="dg-temp-val" x="70" y="60">0°C</text>
+              <text class="dg-label" x="70" y="82">TEMP</text>
+            </svg>
+          </div>
+          <div class="dash-gauge" data-metric="disk">
+            <svg viewBox="0 0 140 140">
+              <circle class="dg-bg" cx="70" cy="70" r="55" />
+              <circle class="dg-fill" id="dg-disk" cx="70" cy="70" r="55" />
+              <text class="dg-value" id="dg-disk-val" x="70" y="60">0%</text>
+              <text class="dg-label" x="70" y="82">DISK</text>
+            </svg>
+          </div>
+          <div class="dash-gauge" data-metric="net">
+            <svg viewBox="0 0 140 140">
+              <circle class="dg-bg" cx="70" cy="70" r="55" />
+              <circle class="dg-fill" id="dg-net" cx="70" cy="70" r="55" />
+              <text class="dg-value" id="dg-net-val" x="70" y="60">OFF</text>
+              <text class="dg-label" x="70" y="82">NET</text>
+            </svg>
+          </div>
+        </div>
+
+        <div class="dash-upcoming-panel hud-panel-flat">
+          <div class="dash-panel-header">
+            <h3><i class="fas fa-bell"></i> UPCOMING SCHEDULE</h3>
+            <div class="dash-up-head-right">
+              <span class="sub-header-telemetry" id="dash-upcoming-count">0 in programma</span>
+              <button class="dash-alert-toggle active" id="dash-alert-toggle" title="Alert acustico attivo">
+                <i class="fas fa-volume-up"></i>
+              </button>
+            </div>
+          </div>
+          <div class="dash-upcoming-list" id="dash-upcoming-list">
+            <div class="dash-upcoming-empty">Acquiring scheduled events...</div>
+          </div>
+        </div>
+
+        <div class="dash-bottom-panel hud-panel-flat">
+          <div class="dash-panel-header">
+            <h3><i class="fas fa-microchip"></i> ACTIVE PROCESSES</h3>
+            <span class="sub-header-telemetry" id="dash-proc-count">0</span>
+          </div>
+          <div class="dash-proc-list" id="dash-proc-list">
+            <div class="dash-proc-loading">Acquiring system processes...</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-editor" class="view-panel hidden">
+        <div id="editor-panel" class="hud-panel-flat flex-grow-column" style="margin:0;border-radius:0;height:100%;">
+          <div id="editor-header">
+            <div class="editor-header-left">
+              <i class="fas fa-code" style="color:var(--accent-cyan);font-size:14px;"></i>
+              <span id="editor-filename" class="editor-filename">NO FILE OPEN</span>
+            </div>
+            <div id="editor-controls">
+              <button class="hud-action-btn" id="btnEditorOpen" title="Open file" style="font-size:9px;padding:6px 10px;">
+                <i class="fas fa-folder-open"></i>
+              </button>
+              <button class="hud-action-btn" id="btnEditorNew" title="New file" style="font-size:9px;padding:6px 10px;">
+                <i class="fas fa-file"></i>
+              </button>
+              <button class="hud-action-btn" id="btnEditorSave" style="font-size:9px;padding:6px 12px;">
+                <i class="fas fa-save"></i> SAVE
+              </button>
+            </div>
+          </div>
+          <div id="editor-body" style="display:flex;flex:1;min-height:0;">
+            <div id="editor-file-tree" class="hidden">
+              <div id="file-tree-header">
+                <span id="file-tree-title">EXPLORE PROJECT</span>
+                <button id="btn-close-tree" class="hud-action-btn" style="font-size:7px;padding:2px 6px;border:none;background:none;">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+              <div id="file-tree-list" class="scrollable"></div>
+            </div>
+            <div id="monaco-editor-container"></div>
+          </div>
+          <div id="editor-status-bar">
+            <span id="editor-status-text">READY</span>
+            <span id="editor-file-path" style="color:rgba(255,255,255,0.15);font-size:9px;margin-left:12px;"></span>
+            <span id="editor-cursor-pos">LN 1, COL 1</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <aside id="right-sidebar" class="hud-panel">
+      <!-- Clock Panel at the top of the right sidebar -->
+      <div class="sidebar-clock-panel">
+        <div class="panel-header sidebar-clock-header">
+          <h2>LIVE_CLOCK</h2>
+        </div>
+        <div id="clock-display">00:00:00</div>
+      </div>
+
+      <div id="sidebar-telemetry-container" class="sidebar-subview flex-grow-column">
+        <div class="panel-header">
+          <h2>DIAGNOSTICS</h2>
+          <span class="sub-header-telemetry">REFRESH: LIVE</span>
+        </div>
+
+        <div class="panel-content scrollable">
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>NEURAL CORE LOAD</span>
+              <span id="txt-cpu-load">0%</span>
+            </div>
+            <div class="progress-gauge">
+              <div class="gauge-fill neon-cyan-glow" id="fill-cpu" style="width: 0%"></div>
+            </div>
+            <div class="micro-stats">AVG: 18.4% // PEAK: 46.2%</div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>MEMORY CONSUMPTION</span>
+              <span id="txt-mem-load">0 GB</span>
+            </div>
+            <div class="progress-gauge">
+              <div class="gauge-fill neon-purple-glow" id="fill-mem" style="width: 0%"></div>
+            </div>
+            <div class="micro-stats">TOTAL AVAILABLE: 16.00 GB</div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>COGNITIVE BRIDGE LATENCY</span>
+              <span id="txt-ping-load">-- ms</span>
+            </div>
+            <div class="progress-gauge">
+              <div class="gauge-fill neon-gold-glow" id="fill-ping" style="width: 0%"></div>
+            </div>
+            <div class="micro-stats">GATEWAY: http://localhost:11434</div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="card-header">
+              <span>POWER CELL CHARGE</span>
+              <span id="txt-battery-load">N/A</span>
+            </div>
+            <div class="progress-gauge">
+              <div class="gauge-fill neon-cyan-glow" id="fill-battery" style="width: 0%"></div>
+            </div>
+            <div class="micro-stats" id="battery-micro">ARC REACTOR // NO BATTERY</div>
+          </div>
+
+          <div class="hud-control-group">
+            <h3>AI MODEL</h3>
+            <select id="model-select" class="hud-select">
+              <option value="mistral">mistral (default)</option>
+            </select>
+            <div class="agent-status-bar">
+              <span class="agent-dot" style="background:var(--accent-cyan)"></span>
+              <span class="agent-status-text" id="model-status-text">SELECT MODEL // AUTO DETECT</span>
+            </div>
+          </div>
+
+          <div class="hud-control-group">
+            <h3>VOICE SYNTHESIS</h3>
+            <button class="hud-action-btn" id="btn-elevenlabs">
+              <span class="indicator"></span> ELEVENLABS TTS
+            </button>
+            <input type="password" id="elevenlabs-key-input" class="hud-input" placeholder="ElevenLabs API Key (opzionale)" style="font-size:9px;padding:6px 8px;" />
+            <button class="mem-scan-btn" id="btn-save-elevenlabs-key" style="margin-top:4px;">
+              <i class="fas fa-key"></i> SAVE KEY
+            </button>
+          </div>
+
+          <div class="hud-control-group">
+            <h3>SYSTEM MODES</h3>
+            <button class="hud-action-btn active" id="btn-overclock">
+              <span class="indicator green"></span> OVERCLOCK
+            </button>
+            <button class="hud-action-btn" id="btn-sound">
+              <span class="indicator green"></span> SOUND EFFECTS
+            </button>
+            <button class="hud-action-btn" id="btn-scanlines">
+              <span class="indicator green"></span> GRAPHICAL SCANLINES
+            </button>
+          </div>
+
+          <div class="hud-control-group" id="editor-sidebar-section" style="display:none;">
+            <h3>EDITOR FILE</h3>
+            <div class="editor-sidebar-bar">
+              <i class="fas fa-file-code" style="color:var(--accent-cyan);font-size:12px;"></i>
+              <span id="sidebar-editor-filename" class="editor-sidebar-filename">NO FILE</span>
+            </div>
+            <button class="mem-scan-btn" id="sidebar-btn-editor-save" style="display:none;">
+              <i class="fas fa-save"></i> SAVE FILE
+            </button>
+            <button class="mem-scan-btn" id="sidebar-btn-import-project" onclick="window.importProject()">
+              <i class="fas fa-folder-open"></i> IMPORT PROJECT
+            </button>
+          </div>
+
+          <div class="hud-control-group">
+            <h3>SPECIALIZED AGENTS</h3>
+            <select id="agent-select" class="hud-select">
+              <option value="auto">AUTO — Automatic Routing</option>
+              <option value="tecnico">TECHNICAL — Programming &amp; Debug</option>
+              <option value="ricercatore">RESEARCHER — Web &amp; News Search</option>
+              <option value="organizzatore">ORGANIZER — Agenda &amp; Tasks</option>
+              <option value="creativo">CREATIVE — Images &amp; Design</option>
+            </select>
+            <div class="agent-status-bar">
+              <span class="agent-dot" id="agent-dot" style="background:var(--accent-cyan)"></span>
+              <span class="agent-status-text" id="agent-status-text">AUTO — Waiting for input</span>
+            </div>
+          </div>
+
+          <div class="hud-control-group">
+            <h3>VOICE INTERFACE</h3>
+            <div class="vc-status-bar">
+              <span class="vc-dot" id="vc-status-dot"></span>
+              <span class="vc-status-text" id="vc-status-text">INIT</span>
+            </div>
+            <button class="hud-action-btn" id="btn-auto-speak">
+              <span class="indicator"></span> AUTO SPEAK
+            </button>
+            <button class="hud-action-btn" id="vc-wake-toggle">
+              <span class="indicator"></span> WAKE WORD "HEY SAVIA"
+            </button>
+            <button class="hud-action-btn" id="vc-continuous-toggle">
+              <span class="indicator"></span> CONTINUOUS CONVERSATION
+            </button>
+          </div>
+
+          <div class="hud-control-group">
+            <h3>MEMORY CORE <span class="mem-badge" id="mem-badge">INIT</span></h3>
+            <div class="mem-section">
+              <div class="mem-header" id="mem-projects-header">
+                <i class="fas fa-folder-open"></i> PROJECTS <span class="mem-count" id="mem-projects-count">0</span>
+              </div>
+              <div class="mem-list" id="mem-projects-list"></div>
+            </div>
+            <button class="mem-scan-btn" id="mem-scan-btn"><i class="fas fa-sync-alt"></i> SCAN PROJECTS</button>
+            <button class="mem-scan-btn" onclick="window.location.href='objectives.html'" style="margin-top:4px;border-color:var(--accent-gold);color:var(--accent-gold);"><i class="fas fa-bullseye"></i> GO TO OBJECTIVES HUB</button>
+          </div>
+        </div>
+
+        <div class="sidebar-ticker-footer" id="system-logs-ticker">
+          <div class="ticker-title">EVENT_LOG <span class="click-hint">// CLICK TO EXPAND</span></div>
+          <div class="ticker-content" id="ticker-events">
+            <div class="ticker-item">[SYS] Active memory registers initialized.</div>
+            <div class="ticker-item">[SYS] Listening on IPC channels.</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <div id="hud-scanlines"></div>
+
+  <div id="boot-overlay">
+    <div class="boot-core">
+      <div class="boot-core-ring">
+        <div class="boot-core-center"></div>
+      </div>
+    </div>
+    <div class="boot-title">S.A.V.I.A</div>
+    <div class="boot-sub">COGNITIVE INTERFACE // POWER-ON SEQUENCE</div>
+    <div id="boot-log" class="boot-log"></div>
+    <div class="boot-progress-track">
+      <div id="boot-bar" class="boot-progress-fill"></div>
+    </div>
+    <div class="boot-footer">
+      <span>SYSTEM BOOT</span>
+      <span id="boot-state">0%</span>
+    </div>
+  </div>
+
+  <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
+  <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="auto"></audio>
+
+  <div id="logs-modal" class="hidden-modal">
+    <div id="logs-modal-content" class="hud-panel-flat">
+      <header class="modal-header">
+        <div class="modal-title-left">
+          <span class="system-status-indicator blink"></span>
+          <span class="modal-title-text">SYSTEM_LOGS_CONSOLE</span>
+        </div>
+        <div class="modal-header-right">
+          <span id="modal-clock">00:00:00</span>
+          <button id="btn-close-modal" class="modal-close-btn"><i class="fas fa-times"></i></button>
+        </div>
+      </header>
+
+      <section class="modal-toolbar">
+        <div class="filter-group">
+            <button class="filter-btn active" data-filter="all">ALL</button>
+            <button class="filter-btn" data-filter="sys">SYSTEM</button>
+            <button class="filter-btn" data-filter="particles">PARTICLES</button>
+            <button class="filter-btn" data-filter="ollama">OLLAMA</button>
+            <button class="filter-btn" data-filter="warn">ALERTS</button>
+        </div>
+        <div class="modal-telemetry">
+          LOGS_COUNT: <span id="modal-logs-count">0</span>
+        </div>
+      </section>
+
+      <main id="modal-logs-body" class="scrollable">
+        <div id="modal-logs-list"></div>
+      </main>
+
+      <footer class="modal-footer-box">
+        <div class="footer-left">
+          <span>LOGGER SICURO // 127.0.0.1</span>
+        </div>
+        <div class="footer-right">
+            <button id="btn-clear-modal-logs" class="hud-action-btn-danger">
+              <span class="indicator red"></span> PULISCI LOG
+            </button>
+            <button id="btn-close-modal-footer" class="hud-action-btn-primary">
+              CHIUDI CONSOLE
+            </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="boot.js"></script>
+  <script src="shared.js"></script>
+  <script src="agents.js"></script>
+  <script src="ollama.js"></script>
+  <script src="telemetry.js"></script>
+  <script src="memory.js"></script>
+  <script src="system-ops.js"></script>
+  <script src="voice-control.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="knowledge-base.js"></script>
+  <script src="editor-integrated.js"></script>
+
+  <script>
+    // Agent selector in sidebar
+    document.addEventListener('DOMContentLoaded', function() {
+      var sel = document.getElementById('agent-select');
+      if (sel) {
+        sel.addEventListener('change', function() {
+          var agentId = this.value;
+          setActiveAgent(agentId);
+          var agent = AGENTS[agentId];
+          var dot = document.getElementById('agent-dot');
+          var statusText = document.getElementById('agent-status-text');
+          if (dot) dot.style.background = agent ? agent.color : 'var(--accent-cyan)';
+          if (statusText) statusText.textContent = agent ? agent.name + ' — ' + agent.desc : 'AUTO';
+          playAudio(audioClick);
+          addTickerEvent('agent', 'Agent override: ' + (agent ? agent.name : 'AUTO'));
+        });
+      }
+
+      document.addEventListener('savia-response-complete', function(e) {
+        var dot = document.getElementById('agent-dot');
+        var statusText = document.getElementById('agent-status-text');
+        var agent = AGENTS[currentAgentId];
+        if (dot) dot.style.background = agent ? agent.color : 'var(--accent-cyan)';
+        if (statusText) statusText.textContent = agent ? agent.name + ' — ' + agent.desc : 'AUTO';
+      });
+
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'editor') {
+        showEditorView();
+        var filePath = params.get('file');
+        if (filePath && window.loadFileInEditor) {
+          window.loadFileInEditor(decodeURIComponent(filePath));
+        }
+      }
+    });
+
+    // Legacy public API used by other scripts
+    window.hideAllViews = function() {
+      ['view-terminal', 'view-dashboard', 'view-editor'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      document.querySelectorAll('#left-sidebar .module-item').forEach(function(el) {
+        el.classList.remove('active');
+        var dot = el.querySelector('.item-status');
+        if (dot) dot.className = 'item-status offline';
+      });
+    };
+    window.showDashboardView = function() {
+      navigateTo('dashboard');
+    };
+    window.showTerminalView = function() {
+      navigateTo('index.html');
+    };
+    window.showEditorView = function(filePath) {
+      navigateTo('editor', filePath ? { file: filePath } : null);
+    };
+    window.toggleEditorSidebar = function(show) {
+      var section = document.getElementById('editor-sidebar-section');
+      if (section) section.style.display = show ? '' : 'none';
+    };
+  </script>
+</body>
+</html>

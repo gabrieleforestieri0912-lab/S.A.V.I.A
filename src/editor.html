@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A. Code Editor</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #1c2128;
+      --border-color: #30363d;
+      --accent-cyan: #00f3ff;
+      --accent-magenta: #ff2a5f;
+      --accent-green: #00ff88;
+      --accent-gold: #ffd700;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --tab-active: #0d1117;
+      --tab-inactive: #161b22;
+      --activity-bg: #0d1117;
+      --sidebar-width: 260px;
+      --activity-width: 48px;
+      --tab-height: 35px;
+      --terminal-height: 200px;
+      --statusbar-height: 22px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body, html {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      -webkit-app-region: drag;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #title-bar {
+      height: 30px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 15px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      -webkit-app-region: drag;
+    }
+    #title-bar .title-text { color: var(--accent-cyan); font-family: 'Orbitron', monospace; letter-spacing: 2px; }
+    #title-bar .title-sep { margin: 0 10px; color: var(--border-color); }
+    #title-bar .title-actions { margin-left: auto; display: flex; gap: 8px; -webkit-app-region: no-drag; }
+    #title-bar .title-btn {
+      width: 20px; height: 20px; border: none; background: transparent; color: var(--text-secondary);
+      cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;
+      border-radius: 3px;
+    }
+    #title-bar .title-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+
+    #main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #activity-bar {
+      width: var(--activity-width);
+      background: var(--activity-bg);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+      gap: 4px;
+      flex-shrink: 0;
+      -webkit-app-region: drag;
+    }
+
+    .activity-icon {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: all 0.15s;
+      font-size: 20px;
+      position: relative;
+      -webkit-app-region: no-drag;
+    }
+    .activity-icon:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+    .activity-icon.active { color: var(--accent-cyan); border-left-color: var(--accent-cyan); background: rgba(0,243,255,0.05); }
+    .activity-icon .tooltip {
+      position: absolute; left: 52px; top: 50%; transform: translateY(-50%);
+      background: var(--bg-tertiary); color: var(--text-primary); padding: 4px 10px;
+      border-radius: 3px; font-size: 12px; white-space: nowrap;
+      border: 1px solid var(--border-color); pointer-events: none;
+      opacity: 0; transition: opacity 0.15s; z-index: 1000;
+    }
+    .activity-icon:hover .tooltip { opacity: 1; }
+
+    #sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: width 0.2s;
+    }
+    #sidebar.collapsed { width: 0; border-right: none; }
+
+    .sidebar-header {
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .sidebar-header .header-actions { display: flex; gap: 4px; }
+    .sidebar-header button {
+      background: none; border: none; color: var(--text-secondary); cursor: pointer;
+      font-size: 14px; padding: 2px 6px; border-radius: 3px;
+    }
+    .sidebar-header button:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+
+    #file-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+    #file-tree::-webkit-scrollbar { width: 8px; }
+    #file-tree::-webkit-scrollbar-track { background: transparent; }
+    #file-tree::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+    .tree-item {
+      display: flex; align-items: center; padding: 3px 8px 3px 16px;
+      cursor: pointer; color: var(--text-primary); white-space: nowrap;
+      user-select: none; position: relative;
+    }
+    .tree-item:hover { background: rgba(255,255,255,0.04); }
+    .tree-item.active { background: rgba(0,243,255,0.08); color: var(--accent-cyan); }
+    .tree-item .icon { width: 18px; margin-right: 6px; font-size: 14px; text-align: center; flex-shrink: 0; }
+    .tree-item .name { overflow: hidden; text-overflow: ellipsis; }
+    .tree-item .name.modified { color: var(--text-secondary); font-style: italic; }
+    .tree-item .chevron {
+      width: 14px; height: 14px; display: inline-flex; align-items: center;
+      justify-content: center; margin-right: 4px; font-size: 10px;
+      color: var(--text-secondary); transition: transform 0.15s; flex-shrink: 0;
+    }
+    .tree-item .chevron.expanded { transform: rotate(90deg); }
+    .tree-children { padding-left: 14px; }
+
+    .folder-item { font-weight: 600; color: var(--text-secondary); }
+    .folder-item .icon { color: var(--accent-gold); font-size: 15px; }
+    .file-item { padding-left: 30px; }
+    .file-item .icon { font-size: 14px; }
+
+    #center-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    #tab-bar {
+      height: var(--tab-height);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    #tab-bar::-webkit-scrollbar { height: 0; }
+
+    .tab-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 12px;
+      height: 100%;
+      background: var(--tab-inactive);
+      border-right: 1px solid var(--border-color);
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-secondary);
+      min-width: 100px;
+      max-width: 200px;
+      position: relative;
+      user-select: none;
+    }
+    .tab-item:first-child { border-left: none; }
+    .tab-item:hover { background: var(--bg-tertiary); }
+    .tab-item.active {
+      background: var(--tab-active);
+      color: var(--text-primary);
+      border-top: 1px solid var(--accent-cyan);
+    }
+    .tab-item .tab-icon { font-size: 14px; flex-shrink: 0; }
+    .tab-item .tab-name {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      flex: 1;
+    }
+    .tab-item .tab-close {
+      width: 16px; height: 16px; border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--text-secondary);
+      opacity: 0; transition: opacity 0.1s; flex-shrink: 0;
+    }
+    .tab-item:hover .tab-close { opacity: 1; }
+    .tab-item .tab-close:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); }
+    .tab-item .unsaved-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--accent-cyan);
+      margin-right: 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s;
+    }
+    .tab-item.unsaved .unsaved-dot { opacity: 1; }
+
+    #editor-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #terminal-panel {
+      height: var(--terminal-height);
+      background: var(--bg-primary);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: height 0.2s;
+    }
+    #terminal-panel.collapsed { height: 28px; }
+
+    .panel-header {
+      height: 28px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .panel-header .panel-title { flex: 1; }
+    .panel-header button {
+      background: none; border: none; color: var(--text-secondary); cursor: pointer;
+      font-size: 12px; padding: 2px 8px; border-radius: 3px;
+    }
+    .panel-header button:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+
+    #terminal-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #cccccc;
+    }
+    #terminal-container::-webkit-scrollbar { width: 8px; }
+    #terminal-container::-webkit-scrollbar-track { background: transparent; }
+    #terminal-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+    .term-line { white-space: pre-wrap; word-break: break-all; }
+    .term-line.command { color: var(--accent-green); }
+    .term-line.error { color: var(--accent-magenta); }
+    .term-line.system { color: var(--accent-cyan); }
+    .term-line.output { color: #cccccc; }
+    .term-line.info { color: var(--accent-gold); }
+
+    #terminal-input-row {
+      display: flex; align-items: center; padding: 6px 12px;
+      border-top: 1px solid var(--border-color); flex-shrink: 0;
+    }
+    #terminal-prompt { color: var(--accent-green); font-family: monospace; font-size: 13px; margin-right: 6px; }
+    #terminal-input {
+      flex: 1; background: transparent; border: none; color: var(--text-primary);
+      font-family: 'Consolas', 'Courier New', monospace; font-size: 13px;
+      outline: none; caret-color: var(--accent-cyan);
+    }
+
+    #status-bar {
+      height: var(--statusbar-height);
+      background: var(--accent-cyan);
+      color: #000;
+      display: flex; align-items: center;
+      padding: 0 10px;
+      font-size: 12px;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    #status-bar .status-item { display: flex; align-items: center; gap: 4px; }
+    #status-bar .status-right { margin-left: auto; display: flex; gap: 14px; }
+    #status-bar .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #000; }
+
+    .welcome-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-family: 'Orbitron', monospace;
+      padding: 40px;
+    }
+    .welcome-logo { font-size: 64px; margin-bottom: 20px; opacity: 0.3; }
+    .welcome-title { font-size: 18px; letter-spacing: 3px; margin-bottom: 10px; }
+    .welcome-sub { font-size: 12px; letter-spacing: 1px; }
+
+    .find-bar {
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 6px 12px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .find-bar.visible { display: flex; }
+    .find-bar input {
+      background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary);
+      padding: 3px 8px; border-radius: 3px; font-size: 13px; outline: none; flex: 1;
+      font-family: inherit;
+    }
+    .find-bar input:focus { border-color: var(--accent-cyan); }
+    .find-bar button {
+      background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);
+      padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;
+    }
+    .find-bar button:hover { background: rgba(255,255,255,0.1); }
+    .find-bar .find-info { color: var(--text-secondary); font-size: 12px; }
+
+    /* Monaco overrides */
+    .monaco-editor { padding-top: 8px !important; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="title-bar">
+      <div>
+        <span class="title-text">S.A.V.I.A</span>
+        <span class="title-sep">|</span>
+        <span>CODE_EDITOR</span>
+      </div>
+      <div id="terminal-bar-toggle" style="margin-right: auto; margin-left: 20px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">
+        <i class="fas fa-terminal"></i> TERMINAL
+      </div>
+      <div class="title-actions">
+        <button class="title-btn" id="btn-minimize" title="Minimize">&#9472;</button>
+        <button class="title-btn" id="btn-maximize" title="Maximize">&#9633;</button>
+        <button class="title-btn" id="btn-close" title="Close">&#10005;</button>
+      </div>
+    </div>
+
+    <div id="main-container">
+      <div id="activity-bar">
+        <div class="activity-icon active" data-panel="explorer" title="Explorer">
+          <i class="fas fa-copy"></i>
+          <span class="tooltip">Explorer</span>
+        </div>
+        <div class="activity-icon" data-panel="search" title="Search">
+          <i class="fas fa-search"></i>
+          <span class="tooltip">Search</span>
+        </div>
+        <div class="activity-icon" data-panel="terminal-btn" title="Terminal">
+          <i class="fas fa-terminal"></i>
+          <span class="tooltip">Terminal</span>
+        </div>
+      </div>
+
+      <div id="sidebar">
+        <div class="sidebar-header">
+          <span>EXPLORER</span>
+      <div class="header-actions">
+        <button id="btn-open-folder" title="Import Project"><i class="fas fa-folder-open"></i></button>
+        <button id="btn-new-file" title="New File"><i class="fas fa-file-circle-plus"></i></button>
+        <button id="btn-new-folder" title="New Folder"><i class="fas fa-folder-plus"></i></button>
+        <button id="btn-refresh" title="Refresh"><i class="fas fa-rotate-right"></i></button>
+      </div>
+        </div>
+        <div id="file-tree"></div>
+      </div>
+
+      <div id="center-panel">
+        <div id="tab-bar"></div>
+
+        <div id="find-bar" class="find-bar">
+          <input type="text" id="find-input" placeholder="Search in file...">
+          <button id="find-prev"><i class="fas fa-chevron-up"></i></button>
+          <button id="find-next"><i class="fas fa-chevron-down"></i></button>
+          <span class="find-info" id="find-info">0 results</span>
+          <button id="find-close"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div id="editor-container">
+          <div class="welcome-screen" id="welcome-screen">
+            <div class="welcome-logo"><i class="fas fa-code"></i></div>
+            <div class="welcome-title">S.A.V.I.A. EDITOR</div>
+            <div class="welcome-sub">Open a file from the explorer to get started</div>
+          </div>
+        </div>
+
+        <div id="terminal-panel">
+          <div class="panel-header">
+            <span class="panel-title"><i class="fas fa-terminal"></i> TERMINAL</span>
+            <button id="btn-term-clear">Clear</button>
+            <button id="btn-term-toggle"><i class="fas fa-chevron-down"></i></button>
+          </div>
+          <div id="terminal-container"></div>
+          <div id="terminal-input-row">
+            <span id="terminal-prompt">$</span>
+            <input type="text" id="terminal-input" placeholder="Enter command..." autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status-bar">
+      <span class="status-item"><span class="status-dot"></span>READY</span>
+      <span class="status-item" id="status-branch"></span>
+      <span class="status-right">
+        <span class="status-item" id="status-encoding">UTF-8</span>
+        <span class="status-item" id="status-lang">Plain Text</span>
+        <span class="status-item" id="status-lines">Ln 1, Col 1</span>
+      </span>
+    </div>
+  </div>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="editor.js"></script>
+</body>
+</html>
