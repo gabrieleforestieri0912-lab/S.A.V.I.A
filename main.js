@@ -3,6 +3,8 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { spawn, execSync } = require('child_process');
+const callServer = require('./src/call-server');
+const proximity = require('./src/proximity-engine');
 
 let mainWindow;
 let isQuitting = false;
@@ -39,6 +41,119 @@ function saveConfig(patch) {
 
 ipcMain.handle('config-get', () => loadConfig());
 ipcMain.handle('config-set', (event, patch) => saveConfig(patch || {}));
+
+// ============================================================
+// SERVICE: CALL HOTLINE (Twilio → tunnel → STT → Ollama → TTS)
+// ============================================================
+const hotlineCacheDir = path.join(app.getPath('userData'), 'hf-cache');
+
+callServer.setConfig({
+  port: (loadConfig().hotlinePort) || 8090,
+  sttCacheDir: hotlineCacheDir,
+  sttModel: loadConfig().hotlineSttModel || 'Xenova/whisper-tiny'
+});
+callServer.setEventSink((type, payload) => {
+  sendToAll('call-event', { type, payload });
+});
+
+function hotlineApplyConfig() {
+  const cfg = loadConfig();
+  callServer.setConfig({
+    port: cfg.hotlinePort || 8090,
+    sttModel: cfg.hotlineSttModel || 'Xenova/whisper-tiny',
+    elevenLabsKey: cfg.elevenLabsKey || '',
+    elevenLabsVoiceId: cfg.hotlineVoiceId || '',
+    twilioAccountSid: cfg.twilioAccountSid || '',
+    twilioAuthToken: cfg.twilioAuthToken || '',
+    twilioPhoneNumber: cfg.twilioPhoneNumber || ''
+  });
+}
+
+ipcMain.handle('call-hotline-start', async () => {
+  hotlineApplyConfig();
+  const startRes = await callServer.start().catch(e => ({ ok: false, error: e.message }));
+  if (!startRes.ok) return { ...startRes, tunnelStatus: callServer.status().tunnelStatus };
+
+  const url = await callServer.startTunnel();
+  let webhook = { ok: false, reason: 'no-tunnel' };
+  if (url) webhook = await callServer.updateTwilioWebhook();
+  return { ok: true, ...callServer.status(), webhook };
+});
+
+ipcMain.handle('call-hotline-stop', () => {
+  callServer.stop();
+  return callServer.status();
+});
+
+ipcMain.handle('call-hotline-status', () => callServer.status());
+
+ipcMain.handle('call-hotline-config', (event, patch) => {
+  const saved = saveConfig(patch || {});
+  hotlineApplyConfig();
+  return callServer.status();
+});
+
+ipcMain.handle('call-hotline-brain', (event, brain) => {
+  callServer.setConfig({
+    brainHost: (brain && brain.ollamaHost) || 'http://localhost:11434',
+    brainModel: (brain && brain.model) || 'mistral',
+    brainSystemPrompt: (brain && brain.systemPrompt) || null
+  });
+  return callServer.status();
+});
+
+ipcMain.handle('call-hotline-stt', async (event, model) => {
+  if (model) callServer.setConfig({ sttModel: model });
+  const r = await callServer.ensureSTT();
+  return { ok: r.ok, ...callServer.status() };
+});
+
+// ============================================================
+// SERVICE: PROXIMITY (BLE RSSI + ADB auto-unlock)
+// ============================================================
+function proximityApplyConfig() {
+  const cfg = loadConfig();
+  proximity.setConfig({
+    pythonPath: cfg.proximityPythonPath || '',
+    adbPath: cfg.proximityAdbPath || '',
+    threshold: typeof cfg.proximityThreshold === 'number' ? cfg.proximityThreshold : -65,
+    cooldownSec: cfg.proximityCooldownSec || 60,
+    checkInterval: cfg.proximityCheckInterval || 3000,
+    devices: cfg.proximityDevices || []
+  });
+}
+
+proximity.setConfig({ pythonPath: '', adbPath: '' });
+proximity.setEventSink((type, payload) => {
+  sendToAll('proximity-event', { type, payload });
+});
+
+ipcMain.handle('proximity-status', async () => proximity.fullStatus());
+ipcMain.handle('proximity-start', async () => proximity.start());
+ipcMain.handle('proximity-stop', () => proximity.stop());
+ipcMain.handle('proximity-config', (event, patch) => {
+  if (patch) saveConfig(patch);
+  proximityApplyConfig();
+  return proximity.status();
+});
+ipcMain.handle('proximity-add-device', (event, dev) => {
+  const res = proximity.addDevice(dev);
+  proximity.setConfig({ devices: res.devices });
+  saveConfig({ proximityDevices: res.devices });
+  return proximity.status();
+});
+ipcMain.handle('proximity-remove-device', (event, mac) => {
+  const res = proximity.removeDevice(mac);
+  proximity.setConfig({ devices: res.devices });
+  saveConfig({ proximityDevices: res.devices });
+  return proximity.status();
+});
+ipcMain.handle('proximity-pair', (event, { hostPort, code }) => proximity.pair(hostPort, code));
+ipcMain.handle('proximity-connect', (event, hostPort) => proximity.connect(hostPort));
+ipcMain.handle('proximity-test-adb', (event, hostPort) => proximity.testAdb(hostPort));
+ipcMain.handle('proximity-unlock-now', (event, mac) => proximity.unlockNow(mac));
+ipcMain.handle('proximity-install-deps', () => proximity.installDeps());
+ipcMain.handle('proximity-install-adb', () => proximity.downloadPlatformTools());
 
 // ============================================================
 // WINDOW CREATION
@@ -116,6 +231,22 @@ app.whenReady().then(() => {
   registerGlobalShortcut();
   refreshBattery();
   setInterval(refreshBattery, 15000);
+
+  // Autostart hotline se abilitata in config
+  if (loadConfig().hotlineEnabled) {
+    hotlineApplyConfig();
+    setTimeout(() => {
+      callServer.start().catch(() => {});
+      callServer.startTunnel().then(() => callServer.updateTwilioWebhook());
+    }, 3000);
+  }
+
+  // Autostart proximity se abilitata in config
+  if (loadConfig().proximityEnabled) {
+    proximityApplyConfig();
+    setTimeout(() => { proximity.start(); }, 4000);
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -123,6 +254,8 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  callServer.stop();
+  proximity.stop();
 });
 
 app.on('window-all-closed', () => {
@@ -132,18 +265,102 @@ app.on('window-all-closed', () => {
 // ============================================================
 // WINDOW CONTROLS
 // ============================================================
-ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
-ipcMain.on('window-maximize', () => {
-  if (mainWindow) {
-    if (mainWindow.isMaximized()) mainWindow.unmaximize();
-    else mainWindow.maximize();
-  }
+ipcMain.on('window-minimize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) win.minimize();
 });
-ipcMain.on('window-close', () => {
-  if (mainWindow) {
+ipcMain.on('window-maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+});
+ipcMain.on('window-close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  // La finestra principale si nasconde nella tray, gli strumenti si chiudono
+  if (win === mainWindow) {
     if (tray) mainWindow.hide();
     else mainWindow.close();
+  } else {
+    win.close();
   }
+});
+
+// ============================================================
+// TOOL WINDOWS — ogni strumento "a schermo intero" vive in una
+// propria finestra desktop, il centro di comando resta visibile
+// ============================================================
+const toolWindows = new Map(); // page → BrowserWindow
+
+// Inoltra un evento a TUTTE le finestre (centro di comando + strumenti)
+function sendToAll(channel, payload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win && !win.isDestroyed()) {
+      try { win.webContents.send(channel, payload); } catch (e) { /* ignore */ }
+    }
+  }
+}
+
+const TOOL_PAGES = new Set([
+  'terminal.html', 'calendar.html', 'objectives.html', 'imagine.html',
+  'particles.html', 'globe.html', 'knowledge.html', 'youtube.html',
+  'hotline.html', 'proximity.html', 'face-training.html'
+]);
+
+ipcMain.handle('open-tool-page', (event, page) => {
+  page = path.basename(String(page || ''));
+
+  // Centro di comando → focus della finestra principale (revive dalla tray)
+  if (page === 'index.html' || page === 'login.html') {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    return { ok: true, mode: 'focus-main' };
+  }
+
+  if (!TOOL_PAGES.has(page)) return { ok: false, mode: 'none' };
+
+  const existing = toolWindows.get(page);
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
+    return { ok: true, mode: 'focus-existing' };
+  }
+
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 1000,
+    minHeight: 700,
+    frame: false,
+    icon: path.join(__dirname, 'savia.png'),
+    backgroundColor: '#070913',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false
+    }
+  });
+
+  win.loadURL('savia://src/' + page);
+  win.once('ready-to-show', () => win.show());
+  win.on('closed', () => toolWindows.delete(page));
+  toolWindows.set(page, win);
+  return { ok: true, mode: 'new-window' };
+});
+
+// Chiudi tutte le finestre strumento all'uscita
+app.on('will-quit', () => {
+  for (const win of toolWindows.values()) {
+    try { win.destroy(); } catch (e) { /* ignore */ }
+  }
+  toolWindows.clear();
 });
 
 // ============================================================
@@ -241,7 +458,7 @@ function startRealTelemetry() {
       battery: lastBattery
     };
 
-    mainWindow.webContents.send('telemetry-update', payload);
+    sendToAll('telemetry-update', payload);
   }, 2000);
 }
 
@@ -290,9 +507,8 @@ ipcMain.handle('fs-index-start', (event, dirPath) => {
   // Start live watcher
   try {
     fsWatcherHandle = fs.watch(targetPath, { recursive: true }, (eventType, filename) => {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
       if (filename) {
-        mainWindow.webContents.send('fs-event', {
+        sendToAll('fs-event', {
           type: eventType,
           file: filename,
           path: path.join(targetPath, filename),
@@ -589,7 +805,7 @@ ipcMain.handle('terminal-execute', (event, command) => {
 
     proc.stdout.on('data', (data) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('terminal-output', {
+        sendToAll('terminal-output', {
           procId, type: 'stdout', data: data.toString()
         });
       }
@@ -597,7 +813,7 @@ ipcMain.handle('terminal-execute', (event, command) => {
 
     proc.stderr.on('data', (data) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('terminal-output', {
+        sendToAll('terminal-output', {
           procId, type: 'stderr', data: data.toString()
         });
       }
@@ -606,7 +822,7 @@ ipcMain.handle('terminal-execute', (event, command) => {
     proc.on('close', (code) => {
       delete terminalProcesses[procId];
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('terminal-output', {
+        sendToAll('terminal-output', {
           procId, type: 'exit', data: code
         });
       }
@@ -615,7 +831,7 @@ ipcMain.handle('terminal-execute', (event, command) => {
     proc.on('error', (err) => {
       delete terminalProcesses[procId];
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('terminal-output', {
+        sendToAll('terminal-output', {
           procId, type: 'error', data: err.message
         });
       }
@@ -1234,7 +1450,7 @@ function checkDueReminders() {
       changed = true;
       sendWinToast('S.A.V.I.A — Promemoria', r.text || 'Promemoria', 'critical');
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('reminder-fired', { type: 'reminder', text: r.text });
+        sendToAll('reminder-fired', { type: 'reminder', text: r.text });
       }
     }
   });
@@ -1250,7 +1466,7 @@ function checkDueReminders() {
       changed = true;
       sendWinToast('S.A.V.I.A — Evento', `${ev.title || 'Evento'}${ev.time ? ' alle ' + ev.time : ''}`, 'normal');
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('reminder-fired', { type: 'calendar', text: ev.title });
+        sendToAll('reminder-fired', { type: 'calendar', text: ev.title });
       }
     }
   });
@@ -1936,4 +2152,28 @@ function stopAllServices() {
     try { terminalProcesses[id].kill(); } catch (e) { /* ignore */ }
   });
   terminalProcesses = {};
+}
+
+// ============================================================
+// EXPORTS — logica pura accessibile ai test (main.test.js)
+// L'export è inoffensivo in Electron ma espone le funzioni pure
+// per la verifica automatica di bug/errori con node:test.
+// ============================================================
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    parseDueDate,
+    chunkText,
+    cosineSimilarity,
+    escapeSingle,
+    dedupKey,
+    isDuplicate,
+    getCpuUsage,
+    fileSignature,
+    scanForProjects,
+    getFolderSize,
+    KB_CHUNK_SIZE,
+    KB_CHUNK_OVERLAP,
+    NOTIF_COOLDOWN_MS,
+    notificationDedup: NOTIF_DEDUP
+  };
 }

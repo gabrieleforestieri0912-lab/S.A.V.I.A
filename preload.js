@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   windowMaximize: () => ipcRenderer.send('window-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),
 
+  // Tool windows: apri pagina tool in nuova finestra (index.html → focus main)
+  openToolPage: (page) => ipcRenderer.invoke('open-tool-page', page),
+
   // Real-time telemetry receiver (push from main)
   onTelemetryUpdate: (callback) => {
     ipcRenderer.on('telemetry-update', (event, data) => callback(data));
@@ -124,6 +127,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // NOTIFICATIONS (Native OS + in-app)
   // ============================================================
   sendNotification: (opts) => ipcRenderer.invoke('send-notification', opts),
+
+  // ============================================================
+  // CALL HOTLINE (Twilio + tunnel + STT/Ollama/TTS)
+  // ============================================================
+  callHotlineStart: () => ipcRenderer.invoke('call-hotline-start'),
+  callHotlineStop: () => ipcRenderer.invoke('call-hotline-stop'),
+  callHotlineStatus: () => ipcRenderer.invoke('call-hotline-status'),
+  callHotlineConfig: (patch) => ipcRenderer.invoke('call-hotline-config', patch),
+  callHotlineBrain: (brain) => ipcRenderer.invoke('call-hotline-brain', brain),
+  callHotlineStt: (model) => ipcRenderer.invoke('call-hotline-stt', model),
+  onCallEvent: (callback) => {
+    ipcRenderer.on('call-event', (event, data) => callback(data));
+  },
+
+  // ============================================================
+  // PROXIMITY (BLE RSSI + ADB auto-unlock)
+  // ============================================================
+  proximityStatus: () => ipcRenderer.invoke('proximity-status'),
+  proximityStart: () => ipcRenderer.invoke('proximity-start'),
+  proximityStop: () => ipcRenderer.invoke('proximity-stop'),
+  proximityConfig: (patch) => ipcRenderer.invoke('proximity-config', patch),
+  proximityAddDevice: (dev) => ipcRenderer.invoke('proximity-add-device', dev),
+  proximityRemoveDevice: (mac) => ipcRenderer.invoke('proximity-remove-device', mac),
+  proximityPair: (hostPort, code) => ipcRenderer.invoke('proximity-pair', { hostPort, code }),
+  proximityConnect: (hostPort) => ipcRenderer.invoke('proximity-connect', hostPort),
+  proximityTestAdb: (hostPort) => ipcRenderer.invoke('proximity-test-adb', hostPort),
+  proximityUnlockNow: (mac) => ipcRenderer.invoke('proximity-unlock-now', mac),
+  proximityInstallDeps: () => ipcRenderer.invoke('proximity-install-deps'),
+  proximityInstallAdb: () => ipcRenderer.invoke('proximity-install-adb'),
+  onProximityEvent: (callback) => {
+    ipcRenderer.on('proximity-event', (event, data) => callback(data));
+  },
 
   // ============================================================
   // LOGIN & EDITOR

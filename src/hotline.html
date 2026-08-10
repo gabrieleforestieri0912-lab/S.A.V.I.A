@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A - Call Hotline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { margin: 0; padding: 0; background: var(--bg-primary); color: var(--accent-cyan); font-family: var(--font-mono); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    #hl-main { flex: 1; display: flex; gap: 24px; padding: 24px; overflow: hidden; }
+    .hl-panel { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .hl-left { width: 360px; flex-shrink: 0; }
+    .hl-right { flex: 1; }
+    .panel-title { font-family: var(--font-hud); font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.35); }
+    .hl-status-card { display: flex; flex-direction: column; gap: 10px; }
+    .hl-status-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: 1px; color: rgba(255,255,255,0.6); }
+    .hl-status-row .hl-val { color: var(--accent-cyan); font-family: var(--font-mono); }
+    .hl-status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .hl-on { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+    .hl-off { background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+    .hl-stby { background: var(--accent-gold); box-shadow: 0 0 8px var(--accent-gold); }
+    .hl-url { font-size: 10px; color: #00ff88; word-break: break-all; line-height: 1.5; }
+    .hl-field { display: flex; flex-direction: column; gap: 4px; }
+    .hl-field label { font-family: var(--font-hud); font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.4); }
+    .hl-field input { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--accent-cyan); font-family: var(--font-mono); font-size: 12px; padding: 8px 10px; border-radius: 4px; outline: none; }
+    .hl-field input:focus { border-color: var(--accent-cyan); box-shadow: 0 0 8px rgba(0,243,255,0.15); }
+    .hl-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+    .hl-btns button { flex: 1; min-width: 120px; }
+    .hl-btns button.wide { flex: 1 1 100%; }
+    .hl-log { flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 12px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px; line-height: 1.7; min-height: 220px; }
+    .hl-log .ln-sys { color: rgba(255,255,255,0.35); }
+    .hl-log .ln-user { color: var(--accent-cyan); }
+    .hl-log .ln-savia { color: #00ff88; }
+    .hl-log .ln-warn { color: var(--accent-gold); }
+    .hl-log .ln-error { color: var(--accent-red); }
+    .hl-check { display: flex; align-items: center; gap: 8px; font-family: var(--font-hud); font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.5); cursor: pointer; }
+    .hl-check input { accent-color: #00ff88; }
+    .hl-hint { font-size: 9px; color: rgba(255,255,255,0.25); letter-spacing: 1px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+  <header id="hud-header">
+    <div class="header-left">
+      <span class="system-status-indicator blink"></span>
+      <span class="system-title">S.A.V.I.A</span>
+      <span class="system-version">v4.0.0</span>
+    </div>
+    <div class="header-center">CALL_HOTLINE // TWILIO // STT_WHISPER_LOCAL</div>
+    <div class="header-right">
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <div id="clock-display">00:00:00</div>
+      <div class="window-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
+        <button class="win-btn" id="btn-close" title="Close">&#10005;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="hl-main">
+
+    <div class="hl-panel hl-left">
+      <div class="panel-title">◆ STATO HOTLINE</div>
+
+      <div class="hl-status-card">
+        <div class="hl-status-row">
+          <span>SERVIZIO</span>
+          <span class="hl-val"><span class="hl-status-dot hl-stby" id="dotService"></span><span id="lblService">OFF</span></span>
+        </div>
+        <div class="hl-status-row">
+          <span>PORTA LOCALE</span>
+          <span class="hl-val" id="lblPort">-</span>
+        </div>
+        <div class="hl-status-row">
+          <span>TUNNEL PUBBLICO</span>
+          <span class="hl-val" id="lblTunnel">OFF</span>
+        </div>
+        <div class="hl-status-row">
+          <span>CHIAMATE ATTIVE</span>
+          <span class="hl-val" id="lblCalls">0</span>
+        </div>
+        <div class="hl-status-row">
+          <span>STT (Whisper)</span>
+          <span class="hl-val" id="lblStt">NON CARICATO</span>
+        </div>
+        <div class="hl-status-row">
+          <span>CERVELLO (Ollama)</span>
+          <span class="hl-val" id="lblBrain">-</span>
+        </div>
+      </div>
+
+      <div class="panel-title" style="margin-top:6px;">◆ URL PUBBLICO / WEBHOOK</div>
+      <div class="hl-url" id="lblUrl">Nessun tunnel attivo. Avvia la hotline per generare l'URL trycloudflare.com. Se hai configurato Twilio, il webhook viene aggiornato automaticamente.</div>
+
+      <div class="hl-btns">
+        <button class="hud-action-btn-primary" id="btnStart"><i class="fas fa-play"></i> START</button>
+        <button class="hud-action-btn" id="btnStop"><i class="fas fa-stop"></i> STOP</button>
+      </div>
+      <button class="hud-action-btn wide" id="btnLoadStt"><i class="fas fa-download"></i> CARICA MODELLO STT (1ª volta)</button>
+
+      <label class="hl-check">
+        <input type="checkbox" id="chkAuto"> AVVIO AUTOMATICO ALL'AVVIO DELL'APP
+      </label>
+    </div>
+
+    <div class="hl-panel hl-right">
+      <div class="panel-title">◆ CONFIGURAZIONE</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="hl-field">
+          <label>PORTA LOCALE</label>
+          <input type="number" id="cfgPort" value="8090" />
+        </div>
+        <div class="hl-field">
+          <label>MODELLO STT (Whisper)</label>
+          <input type="text" id="cfgSttModel" value="Xenova/whisper-tiny" />
+        </div>
+        <div class="hl-field">
+          <label>TWILIO ACCOUNT SID</label>
+          <input type="text" id="cfgTwilioSid" placeholder="ACxxxxxxxx..." />
+        </div>
+        <div class="hl-field">
+          <label>TWILIO AUTH TOKEN</label>
+          <input type="password" id="cfgTwilioToken" placeholder="••••••••" />
+        </div>
+        <div class="hl-field">
+          <label>NUMERO TWILIO (E.164)</label>
+          <input type="text" id="cfgTwilioNumber" placeholder="+39..." />
+        </div>
+        <div class="hl-field">
+          <label>ELEVENLABS VOICE ID (opzionale, usa key salvata)</label>
+          <input type="text" id="cfgVoiceId" placeholder="es. 21m00Tcm4TlvDq8ikWAM" />
+        </div>
+      </div>
+
+      <div class="hl-btns">
+        <button class="hud-action-btn" id="btnSave"><i class="fas fa-save"></i> SALVA CONFIG</button>
+        <button class="hud-action-btn" id="btnTestTwi"><i class="fas fa-sync-alt"></i> RIPRENDI TUNNEL + AGGIORNA WEBHOOK</button>
+      </div>
+
+      <div class="panel-title">◆ REGISTRO CHIAMATE</div>
+      <div class="hl-log" id="hlLog"><div class="ln-sys">// hotline log pronto</div></div>
+
+      <div class="hl-hint">
+        Setup: 1) inserisci credenziali Twilio e numero, salva. 2) START (genera tunnel + aggiorna webhook del numero). 3) CARICA MODELLO STT la prima volta (~75MB, cache in userData).<br>
+        Quando il telefono chiama il numero, S.A.V.I.A risponde con la voce ElevenLabs e il cervello Ollama (modello selezionato nella dashboard).
+      </div>
+    </div>
+
+  </main>
+
+  <script src="hotline.js"></script>
+  <script src="nav-windows.js"></script>
+</body>
+</html>

@@ -6,6 +6,10 @@ const OLLAMA_HOST = 'http://localhost:11434';
 const terminalLogs = document.getElementById('terminal-logs');
 const terminalInput = document.getElementById('terminal-input');
 const terminalForm = document.getElementById('terminal-input-form');
+
+terminalInput.addEventListener('input', () => {
+  stopSpeaking();
+});
 const typingIndicator = document.getElementById('typing-indicator');
 const systemBridgeStatus = document.getElementById('system-bridge-status');
 
@@ -83,14 +87,14 @@ function getCurrentPage() {
 
 const ACTION_MAP = {
   // ── Navigation ──
-  navigate_index:        { el: null, fn: () => { window.location.href = 'index.html'; }, pages: ['particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_particles:    { el: null, fn: () => { window.location.href = 'particles.html'; }, pages: ['index.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_terminal:     { el: null, fn: () => { window.location.href = 'terminal.html'; }, pages: ['index.html','particles.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_knowledge:    { el: null, fn: () => { window.location.href = 'knowledge.html'; }, pages: ['index.html','particles.html','terminal.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_globe:        { el: null, fn: () => { window.location.href = 'globe.html'; }, pages: ['index.html','particles.html','terminal.html','knowledge.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_objectives:   { el: null, fn: () => { window.location.href = 'objectives.html'; }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','imagine.html','calendar.html'] },
-  navigate_calendar:     { el: null, fn: () => { window.location.href = 'calendar.html'; }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','imagine.html'] },
-  navigate_imagine:      { el: null, fn: () => { window.location.href = 'imagine.html'; }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','calendar.html'] },
+  navigate_index:        { el: null, fn: () => { window.saviaOpen('index.html'); }, pages: ['particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
+  navigate_particles:    { el: null, fn: () => { window.saviaOpen('particles.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
+  navigate_terminal:     { el: null, fn: () => { window.saviaOpen('terminal.html'); }, pages: ['index.html','particles.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
+  navigate_knowledge:    { el: null, fn: () => { window.saviaOpen('knowledge.html'); }, pages: ['index.html','particles.html','terminal.html','globe.html','objectives.html','imagine.html','calendar.html'] },
+  navigate_globe:        { el: null, fn: () => { window.saviaOpen('globe.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','objectives.html','imagine.html','calendar.html'] },
+  navigate_objectives:   { el: null, fn: () => { window.saviaOpen('objectives.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','imagine.html','calendar.html'] },
+  navigate_calendar:     { el: null, fn: () => { window.saviaOpen('calendar.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','imagine.html'] },
+  navigate_imagine:      { el: null, fn: () => { window.saviaOpen('imagine.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','calendar.html'] },
 
   // ── System toggles ──
   toggle_overclock:      { el: 'btn-overclock', fn: null, pages: ['index.html','terminal.html'] },
@@ -130,7 +134,10 @@ const ACTION_MAP = {
   memory_scan_projects:  { el: 'mem-scan-btn', fn: null, pages: ['index.html'] },
 
   // ── YouTube ──
-  navigate_youtube:      { el: null, fn: () => { window.location.href = 'youtube.html'; }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
+  navigate_youtube:      { el: null, fn: () => { window.saviaOpen('youtube.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
+  navigate_face_training:{ el: null, fn: () => { window.saviaOpen('face-training.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
+  navigate_hotline:      { el: null, fn: () => { window.saviaOpen('hotline.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
+  navigate_proximity:    { el: null, fn: () => { window.saviaOpen('proximity.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
   yt_search:             { el: null, fn: () => {
     const input = document.getElementById('yt-search-input');
     const btn = document.getElementById('yt-search-btn');
@@ -193,6 +200,18 @@ const ACTION_KEYWORDS = {
   'vai al calendario': 'navigate_calendar',
   'apri calendario': 'navigate_calendar',
   'vai a calendar': 'navigate_calendar',
+  'addestra il volto': 'navigate_face_training',
+  'apri face training': 'navigate_face_training',
+  'vai al face training': 'navigate_face_training',
+  'addestramento facciale': 'navigate_face_training',
+  'vai alla hotline': 'navigate_hotline',
+  'apri la hotline': 'navigate_hotline',
+  'apri hotline': 'navigate_hotline',
+  'chiamata telefonica': 'navigate_hotline',
+  'vai alla prossimità': 'navigate_proximity',
+  'apri la prossimità': 'navigate_proximity',
+  'dispositivi vicini': 'navigate_proximity',
+  'sblocca telefono': 'navigate_proximity',
   'vai a imagine': 'navigate_imagine',
   'vai alla generazione immagini': 'navigate_imagine',
   'apri imagine': 'navigate_imagine',
@@ -504,6 +523,8 @@ terminalForm.addEventListener('submit', async (e) => {
   const query = terminalInput.value.trim();
   if (!query) return;
 
+  stopSpeaking();
+
   playAudio(audioClick);
 
   appendLogMessage('user', query, 'user');
@@ -686,6 +707,17 @@ if (synth) {
   }
 }
 
+let ttsAudioEl = null;
+
+function stopSpeaking() {
+  if (ttsAudioEl) { try { ttsAudioEl.pause(); } catch (e) {} }
+  ttsAudioEl = null;
+  if (synth) { try { synth.cancel(); } catch (e) {} }
+  if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
+}
+
+window.saviaStopSpeaking = stopSpeaking;
+
 function updateElevenLabsUI() {
   if (!elevenLabsBtn) elevenLabsBtn = document.getElementById('btn-elevenlabs');
   if (elevenLabsBtn) {
@@ -811,17 +843,21 @@ async function elevenLabsSpeak(text) {
     var blob = await res.blob();
     var url = URL.createObjectURL(blob);
     var audio = new Audio(url);
+    ttsAudioEl = audio;
 
     return new Promise(function(resolve) {
       audio.onended = function() {
+        if (ttsAudioEl === audio) ttsAudioEl = null;
         URL.revokeObjectURL(url);
         resolve(true);
       };
       audio.onerror = function() {
+        if (ttsAudioEl === audio) ttsAudioEl = null;
         URL.revokeObjectURL(url);
         resolve(false);
       };
       audio.play().catch(function() {
+        if (ttsAudioEl === audio) ttsAudioEl = null;
         URL.revokeObjectURL(url);
         resolve(false);
       });

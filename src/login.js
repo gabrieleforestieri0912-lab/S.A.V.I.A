@@ -15,9 +15,7 @@ const resetBtn = document.getElementById('btnReset');
 const MODEL_URL = 'models';
 
 const MAX_ATTEMPTS = 5;
-const MATCH_THRESHOLD = 0.55;
 const BYPASS_TIMEOUT = 15000;
-const FACE_DESCRIPTOR_KEY = 'savia-face-descriptor';
 
 let modelsLoaded = false;
 let isUnlocking = false;
@@ -29,7 +27,7 @@ let noFaceTimer = null;
 let currentDisplaySize = null;
 
 function forgotFaceData() {
-  localStorage.removeItem(FACE_DESCRIPTOR_KEY);
+  FaceTraining.clearProfile();
 }
 
 function updateClock() {
@@ -42,6 +40,10 @@ updateClock();
 document.getElementById('btn-minimize')?.addEventListener('click', () => window.electronAPI?.windowMinimize());
 document.getElementById('btn-maximize')?.addEventListener('click', () => window.electronAPI?.windowMaximize());
 document.getElementById('btn-close')?.addEventListener('click', () => window.electronAPI?.windowClose());
+
+document.getElementById('btn-train') || document.getElementById('btnTrain')?.addEventListener('click', () => {
+  window.location.href = 'face-training.html';
+});
 
 bypassBtn.addEventListener('click', () => {
   setStatus('BYPASS MANUALE ATTIVATO', 'success');
@@ -147,9 +149,9 @@ function startFaceScanning(displaySize) {
         drawCyberBox(detection, displaySize);
         drawLandmarks(detection.landmarks, displaySize);
 
-        const savedDescriptorJson = localStorage.getItem(FACE_DESCRIPTOR_KEY);
+        const profile = FaceTraining.loadProfile();
 
-        if (!savedDescriptorJson) {
+        if (!profile) {
           setStatus('PROFILO BIOMETRICO NON TROVATO - REGISTRAZIONE...', 'scanning');
           setMatch(detection.detection.score);
           setSecurityLevel(detection.detection.score);
@@ -166,17 +168,28 @@ function startFaceScanning(displaySize) {
 
           if (detection.detection.score > 0.7) {
             clearInterval(scanInterval);
-            localStorage.setItem(FACE_DESCRIPTOR_KEY, JSON.stringify(Array.from(detection.descriptor)));
+            const descriptor = Array.from(detection.descriptor);
+            const now = new Date().toISOString();
+            FaceTraining.saveProfile({
+              version: 2,
+              subject: 'owner',
+              engine: 'face-api.js@1.7.15',
+              descriptor,
+              sampleCount: 1,
+              createdAt: now,
+              updatedAt: now,
+              quality: detection.detection.score
+            });
             setStatus('PROFILO BIOMETRICO REGISTRATO', 'success');
             setMatch(1);
             setSecurityLevel(1);
             setTimeout(unlock, 1500);
           }
         } else {
-          const savedDescriptor = new Float32Array(JSON.parse(savedDescriptorJson));
-          const distance = faceapi.euclideanDistance(detection.descriptor, savedDescriptor);
-          const confidence = Math.max(0, Math.min(1, 1 - distance));
-          const match = distance < MATCH_THRESHOLD;
+          const result = FaceTraining.verify(detection.descriptor, profile);
+          const distance = result.distance;
+          const confidence = result.confidence;
+          const match = result.match;
 
           setMatch(confidence);
           setSecurityLevel(confidence);

@@ -252,6 +252,7 @@ function updateStats() {
 }
 
 function parseDuration(iso) {
+  if (iso == null) return '';
   const match = iso.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
   if (!match) return '';
   const h = (match[1] || '').replace('H', '');
@@ -401,3 +402,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initYouTube();
   renderChannels();
 });
+
+// ============================================================
+// EXPORTS — logica pura accessibile ai test (node:test)
+// Inerte nel browser (module non definito nel renderer).
+// ============================================================
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    YT_CHANNELS,
+    parseDuration,
+    escHtml
+  };
+}

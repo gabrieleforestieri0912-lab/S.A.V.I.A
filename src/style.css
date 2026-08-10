@@ -2753,6 +2753,98 @@ body.boot-locked { overflow: hidden; }
   font-weight: bold;
 }
 
+/* Globo — Ricerca città */
+.globe-city-search {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(0, 12, 24, 0.6);
+  border: 1px solid rgba(0, 243, 255, 0.25);
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.globe-city-search::placeholder { color: rgba(255, 255, 255, 0.25); }
+.globe-city-search:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0, 243, 255, 0.25);
+}
+.globe-city-results {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+.globe-city-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 243, 255, 0.08);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.globe-city-result:hover {
+  background: rgba(0, 243, 255, 0.08);
+  border-color: rgba(0, 243, 255, 0.35);
+}
+.globe-city-result.empty { cursor: default; color: rgba(255, 255, 255, 0.3); }
+.gcr-name {
+  font-family: var(--font-hud);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #fff;
+}
+.gcr-country {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Globo — Label LOD compatta (vista globale) */
+.globe-marker-label.compact {
+  min-width: 0;
+  padding: 3px 8px;
+  background: rgba(8, 12, 24, 0.6);
+}
+.globe-marker-label.compact .gml-time,
+.globe-marker-label.compact .gml-weather { display: none; }
+
+/* Globo — Dettaglio città arricchito */
+.city-detail-temp-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.cd-dn-badge {
+  font-family: var(--font-hud);
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--accent-gold);
+  border: 1px solid rgba(255, 180, 0, 0.35);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 180, 0, 0.06);
+}
+.city-miniforecast-title {
+  font-family: var(--font-hud);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 8px 0 4px 0;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 243, 255, 0.1);
+}
+
 /* ─────────────── YOUTUBE CONTROL ─────────────── */
 
 .yt-banner {

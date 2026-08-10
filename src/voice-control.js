@@ -1,6 +1,12 @@
 /**
  * S.A.V.I.A - Complete Voice Control System
  * Wake word, STT, TTS, continuous conversation mode
+ *
+ * Optimized:
+ *  - Single recognizer, no mic contention between wake/capture
+ *  - Mic fully released during PROCESSING / SPEAKING (no echo self-trigger)
+ *  - Command capture timeout + silence-aware end detection
+ *  - Robust error handling with backoff (network) and fatal guards (not-allowed)
  */
 
 const VoiceState = {
@@ -15,11 +21,12 @@ const VoiceState = {
 let voiceState = VoiceState.IDLE;
 let wakeActive = false;
 let continuousMode = false;
-let wakeRecognizer = null;
-let cmdRecognizer = null;
-let restartTimeout = null;
+let recognizer = null;
+let captureTimeout = null;
 let wakeListening = false;
 let voiceAudioInProgress = false;
+let restartTimer = null;
+let commandTimeoutMs = 8000;
 
 // DOM refs
 const vcStatusDot = document.getElementById('vc-status-dot');
@@ -51,18 +58,11 @@ function containsWakeWord(text) {
 }
 
 function extractCommand(text) {
-  const norm = text.toLowerCase();
+  const norm = normalizeText(text);
   for (const w of WAKE_WORDS) {
     const idx = norm.indexOf(w);
     if (idx >= 0) {
       const cmd = text.substring(idx + w.length).trim();
-      if (cmd) return cmd;
-    }
-  }
-  // Try finding at start
-  for (const w of WAKE_WORDS) {
-    if (norm.startsWith(w)) {
-      const cmd = text.substring(w.length).trim();
       if (cmd) return cmd;
     }
   }
@@ -130,31 +130,69 @@ function setVoiceState(newState) {
   if (prev !== newState && newState === VoiceState.WAKE_HEARD) {
     playAudio(audioBeep);
   }
+
+  // While SAVIA is thinking or speaking the mic is fully released:
+  // avoids echo wake-triggers and frees the audio device for TTS.
+  if (newState === VoiceState.PROCESSING || newState === VoiceState.SPEAKING) {
+    releaseRecognizer();
+  }
+}
+
+function releaseRecognizer() {
+  if (captureTimeout) { clearTimeout(captureTimeout); captureTimeout = null; }
+  if (recognizer) {
+    try { recognizer.onend = null; recognizer.stop(); } catch(e) {}
+    recognizer = null;
+  }
+  wakeListening = false;
+}
+
+// ── Recognizer factory ──────────────────────────────────────────────
+
+function createRecognizer(opts) {
+  const rec = new SR();
+  rec.lang = 'it-IT';
+  rec.continuous = !!opts.continuous;
+  rec.interimResults = !!opts.interim;
+  return rec;
+}
+
+function handleRecError(err) {
+  const code = err.error;
+  if (code === 'aborted') return; // our own stop()
+  if (code === 'no-speech') {
+    addTickerEvent('sys', 'Nessun input vocale rilevato.');
+    return;
+  }
+  if (code === 'not-allowed' || code === 'service-not-allowed') {
+    wakeActive = false;
+    updateWakeUI();
+    addTickerEvent('error', 'Accesso microfono negato. Controlla i permessi.');
+    if (vcStatusText) vcStatusText.textContent = 'MIC DENIED';
+    return;
+  }
+  if (code === 'network') {
+    addTickerEvent('warn', 'Servizio riconoscimento vocale: retry.');
+    return;
+  }
+  addTickerEvent('warn', 'Riconoscimento vocale: ' + (code || 'errore sconosciuto'));
 }
 
 // ── Wake Word Listener ──────────────────────────────────────────────
 
-let wakeHeartbeat = null;
-let wakeRestartLock = false;
-
 function startWakeListener() {
-  if (!voiceSupported || !wakeActive || wakeRestartLock) return;
+  if (!voiceSupported || !wakeActive) return;
+  if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
+  if (wakeListening) return;
 
-  wakeRestartLock = true;
+  releaseRecognizer();
 
-  if (wakeRecognizer) {
-    try { wakeRecognizer.stop(); } catch(e) {}
-    wakeRecognizer = null;
-  }
-
-  wakeRecognizer = new SR();
-  wakeRecognizer.lang = 'it-IT';
-  wakeRecognizer.continuous = true;
-  wakeRecognizer.interimResults = true;
-
+  const rec = createRecognizer({ continuous: true, interim: true });
+  recognizer = rec;
+  wakeListening = true;
   let heardWake = false;
 
-  wakeRecognizer.onresult = (event) => {
+  rec.onresult = (event) => {
     if (heardWake) return;
 
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -163,120 +201,132 @@ function startWakeListener() {
         heardWake = true;
         setVoiceState(VoiceState.WAKE_HEARD);
 
-        const fullText = event.results[i][0].transcript;
-        const command = extractCommand(fullText);
+        const command = extractCommand(transcript);
+        const isFinal = event.results[i].isFinal;
 
-        try { wakeRecognizer.stop(); } catch(e) {}
-        wakeListening = false;
-
-        if (command && command.length > 1) {
-          setTimeout(() => processVoiceCommand(command), 400);
+        // Grab the most complete transcript available, then hand off.
+        if (isFinal || command.length > 0) {
+          releaseRecognizer();
+          if (command && command.length > 1) {
+            setTimeout(() => processVoiceCommand(command), 400);
+          } else {
+            setTimeout(() => startCommandCapture(), 400);
+          }
         } else {
-          setTimeout(() => startCommandCapture(), 400);
+          heardWake = false;
         }
         break;
       }
     }
   };
 
-  wakeRecognizer.onerror = (err) => {
-    heardWake = false;
+  rec.onerror = (err) => {
     wakeListening = false;
-    wakeRestartLock = false;
-    if (wakeActive) scheduleWakeRestart();
+    recognizer = null;
+    handleRecError(err);
+    if (wakeActive && voiceState === VoiceState.WAKE_LISTEN) scheduleWakeRestart(250);
   };
 
-  wakeRecognizer.onend = () => {
+  rec.onend = () => {
+    if (recognizer === rec) recognizer = null;
     wakeListening = false;
-    wakeRestartLock = false;
-    if (wakeActive && !heardWake) {
-      scheduleWakeRestart();
+    if (wakeActive && !heardWake && voiceState === VoiceState.WAKE_LISTEN) {
+      scheduleWakeRestart(200);
     }
   };
 
   try {
-    wakeRecognizer.start();
-    wakeListening = true;
-    wakeRestartLock = false;
+    rec.start();
     setVoiceState(VoiceState.WAKE_LISTEN);
   } catch(e) {
-    wakeRestartLock = false;
-    scheduleWakeRestart();
+    recognizer = null;
+    wakeListening = false;
+    scheduleWakeRestart(300);
   }
-
-  if (wakeHeartbeat) clearInterval(wakeHeartbeat);
-  wakeHeartbeat = setInterval(() => {
-    if (wakeActive && !wakeListening && !wakeRestartLock && voiceState === VoiceState.WAKE_LISTEN) {
-      startWakeListener();
-    }
-  }, 5000);
 }
 
 function stopWakeListener() {
-  if (wakeHeartbeat) { clearInterval(wakeHeartbeat); wakeHeartbeat = null; }
-  if (wakeRecognizer) {
-    try { wakeRecognizer.stop(); } catch(e) {}
-    wakeRecognizer = null;
-  }
-  wakeListening = false;
+  releaseRecognizer();
 }
 
-function scheduleWakeRestart() {
-  if (!wakeActive || wakeRestartLock) return;
-  if (restartTimeout) clearTimeout(restartTimeout);
-  restartTimeout = setTimeout(() => {
-    if (!wakeActive || wakeRestartLock) return;
-    if (voiceState === VoiceState.CAPTURING || voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) {
-      scheduleWakeRestart();
-      return;
-    }
+function scheduleWakeRestart(delay) {
+  if (!wakeActive || voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
+  if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    if (!wakeActive || voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
     startWakeListener();
-  }, 300);
+  }, delay || 300);
 }
 
 // ── Command Capture ─────────────────────────────────────────────────
 
 function startCommandCapture() {
   if (!voiceSupported || !wakeActive) return;
+
+  releaseRecognizer();
+
   setVoiceState(VoiceState.CAPTURING);
 
-  if (cmdRecognizer) {
-    try { cmdRecognizer.stop(); } catch(e) {}
-  }
+  const rec = createRecognizer({ continuous: false, interim: true });
+  recognizer = rec;
+  wakeListening = true;
+  let handled = false;
 
-  cmdRecognizer = new SR();
-  cmdRecognizer.lang = 'it-IT';
-  cmdRecognizer.continuous = false;
-  cmdRecognizer.interimResults = false;
+  captureTimeout = setTimeout(() => {
+    if (handled) return;
+    handled = true;
+    releaseRecognizer();
+    addTickerEvent('sys', 'Timeout comando vocale — nessun input.');
+    setVoiceState(VoiceState.IDLE);
+    if (wakeActive) scheduleWakeRestart(250);
+  }, commandTimeoutMs);
 
-  cmdRecognizer.onresult = (event) => {
-    const command = event.results[0][0].transcript;
-    cmdRecognizer = null;
-    if (command.trim()) {
-      processVoiceCommand(command.trim());
+  rec.onresult = (event) => {
+    let best = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) best = t;
+    }
+    if (!best) return;
+
+    handled = true;
+    releaseRecognizer();
+
+    if (best.trim()) {
+      processVoiceCommand(best.trim());
     } else {
       setVoiceState(VoiceState.IDLE);
-      if (wakeActive) startWakeListener();
+      if (wakeActive) scheduleWakeRestart(200);
     }
   };
 
-  cmdRecognizer.onerror = () => {
-    cmdRecognizer = null;
+  rec.onerror = (err) => {
+    if (handled) return;
+    handled = true;
+    releaseRecognizer();
+    handleRecError(err);
     setVoiceState(VoiceState.IDLE);
-    if (wakeActive) setTimeout(() => startWakeListener(), 200);
+    if (wakeActive) scheduleWakeRestart(300);
   };
 
-  cmdRecognizer.onend = () => {
-    cmdRecognizer = null;
-    if (voiceState === VoiceState.CAPTURING) {
-      setVoiceState(VoiceState.IDLE);
-      if (wakeActive) setTimeout(() => startWakeListener(), 200);
-    }
+  rec.onend = () => {
+    if (recognizer === rec) recognizer = null;
+    wakeListening = false;
+    if (handled) return;
+    handled = true;
+    releaseRecognizer();
+    setVoiceState(VoiceState.IDLE);
+    if (wakeActive) scheduleWakeRestart(200);
   };
 
-  try { cmdRecognizer.start(); } catch(e) {
+  try { rec.start(); } catch(e) {
+    if (handled) return;
+    handled = true;
+    recognizer = null;
+    wakeListening = false;
     setVoiceState(VoiceState.IDLE);
-    if (wakeActive) startWakeListener();
+    if (wakeActive) scheduleWakeRestart(300);
   }
 }
 
@@ -285,17 +335,15 @@ function startCommandCapture() {
 async function processVoiceCommand(command) {
   if (!command) {
     setVoiceState(VoiceState.IDLE);
-    if (wakeActive) startWakeListener();
+    if (wakeActive) scheduleWakeRestart(200);
     return;
   }
 
   setVoiceState(VoiceState.PROCESSING);
   addTickerEvent('sys', `[VOCE] Comando: "${command}"`);
 
-  // Append to chat
   appendLogMessage('user', `[VOCE] ${command}`, 'user');
 
-  // Set input and submit
   terminalInput.value = command;
   terminalForm.dispatchEvent(new Event('submit'));
 }
@@ -348,11 +396,14 @@ function toggleWake() {
   updateWakeUI();
 
   if (wakeActive) {
-    startWakeListener();
+    if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) {
+      addTickerEvent('sys', 'Wake word pronto al termine della risposta.');
+    } else {
+      startWakeListener();
+    }
     addTickerEvent('sys', 'Wake word attivato. Say "Hey SAVIA" per chiamarmi.');
   } else {
     stopWakeListener();
-    if (cmdRecognizer) { try { cmdRecognizer.stop(); } catch(e) {} cmdRecognizer = null; }
     setVoiceState(VoiceState.IDLE);
     addTickerEvent('sys', 'Wake word disattivato.');
   }

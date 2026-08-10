@@ -56,3 +56,8 @@ coverage/
 # Electron
 electron-builder/
 yarn-error.log
+
+# Proximity: downloads / build artifacts
+tools/platform-tools/
+tools/platform-tools.zip
+tools/ble-scan.exe

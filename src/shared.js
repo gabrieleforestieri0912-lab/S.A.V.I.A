@@ -47,7 +47,7 @@ if (clockDisplay) {
   clockDisplay.title = 'Click to open Global Timeline';
   clockDisplay.addEventListener('click', function () {
     playAudio(audioClick);
-    window.location.href = 'globe.html';
+    window.saviaOpen('globe.html');
   });
 }
 
@@ -410,6 +410,10 @@ const NAV_PAGES = {
   'youtube.html':     { title: 'CONTROLLO_YOUTUBE',  external: true },
 };
 
+// True quando la pagina corrente vive in una finestra-strumento dedicata
+// (in tal caso "index.html" deve riportare al centro di comando, non cambiare vista)
+const IS_TOOL_WINDOW = /(?:terminal|calendar|objectives|imagine|particles|globe|knowledge|youtube|hotline|proximity|face-training)\.html$/.test(location.pathname);
+
 let navReady = false;
 let currentNavPage = null;
 
@@ -424,13 +428,15 @@ function navigateTo(pageId, params = null, pushHistory = true) {
 
   currentNavPage = pageId;
 
-  if (page.external) {
+  // Pagine "esterna" (strumenti a schermo intero) → nuova finestra desktop;
+  // da una finestra-strumento anche il ritorno al comando passa dal main process
+  if (page.external || (IS_TOOL_WINDOW && pageId === 'index.html')) {
     let url = pageId;
     if (params && typeof params === 'object') {
       const qs = new URLSearchParams(params).toString();
       if (qs) url += '?' + qs;
     }
-    window.location.href = url;
+    window.saviaOpen(url);
     return;
   }
 

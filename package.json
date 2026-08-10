@@ -4,7 +4,8 @@
   "description": "S.A.V.I.A — Cognitive HUD & AI Assistant with Ollama, Notion sync, YouTube, and multi-agent routing",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\""
   },
   "keywords": [
     "electron",
@@ -18,6 +19,9 @@
     "electron": "^31.0.0"
   },
   "dependencies": {
-    "@vladmandic/face-api": "^1.7.15"
+    "@huggingface/transformers": "^4.2.0",
+    "@vladmandic/face-api": "^1.7.15",
+    "onnxruntime-node": "^1.27.0",
+    "ws": "^8.18.0"
   }
 }

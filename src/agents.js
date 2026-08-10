@@ -308,3 +308,19 @@ async function executeAgentTool(text) {
       return null;
   }
 }
+
+// ============================================================
+// EXPORTS — logica pura accessibile ai test (node:test)
+// Inerte nel browser (module non definito nel renderer).
+// ============================================================
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    AGENTS,
+    setActiveAgent,
+    getActiveAgent,
+    classifyByKeywords,
+    classifyWithLLM,
+    routeQuery,
+    parseAgentTools
+  };
+}

@@ -131,8 +131,27 @@
         <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
           <div class="nav-icon"><i class="fab fa-youtube"></i></div>
           <div class="nav-label">
-            <span class="nav-label-main">YOUTUBE_CONTROL</span>
-            <span class="nav-label-sub">Video Search & Filter</span>
+            <span class="nav-label-main">YOUTUBE</span>
+            <span class="nav-label-sub">Video Explorer</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-divider"></div>
+        <div class="nav-rail-section-label">COMM</div>
+
+        <div class="nav-rail-item" onclick="window.location.href='hotline.html'">
+          <div class="nav-icon"><i class="fas fa-phone"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">CALL_HOTLINE</span>
+            <span class="nav-label-sub">Telefono → AI</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='proximity.html'">
+          <div class="nav-icon"><i class="fas fa-broadcast-tower"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">PROXIMITY_NEARBY</span>
+            <span class="nav-label-sub">BLE & Auto-Unlock</span>
           </div>
         </div>
       </div>
@@ -673,5 +692,6 @@
       if (section) section.style.display = show ? '' : 'none';
     };
   </script>
+  <script src="nav-windows.js"></script>
 </body>
 </html>

@@ -416,7 +416,7 @@ function renderUpcoming(list) {
       ? `<button class="dash-up-del" data-kind="${item.kind}" data-id="${escHtml(itemId)}" title="Elimina" onclick="event.stopPropagation(); deleteUpcomingItem('${item.kind}','${escHtml(itemId)}')"><i class="fas fa-trash-alt"></i></button>`
       : '';
     return `
-      <div class="dash-up-row type-${item.kind}" data-kind="${item.kind}" data-id="${escHtml(itemId)}" title="${escHtml(item.title)} — ${dayLabel}${timeStr ? ' ' + timeStr : ''}" onclick="window.location.href='${target}'">
+      <div class="dash-up-row type-${item.kind}" data-kind="${item.kind}" data-id="${escHtml(itemId)}" title="${escHtml(item.title)} — ${dayLabel}${timeStr ? ' ' + timeStr : ''}" onclick="window.saviaOpen('${target}')">
         <span class="dash-up-icon"><i class="fas ${icon}"></i></span>
         <span class="dash-up-title">${escHtml(item.title)}</span>
         <span class="dash-up-when">${dayLabel}${timeStr ? ' ' + timeStr : ''}</span>
@@ -678,3 +678,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ============================================================
+// EXPORTS — logica pura accessibile ai test (node:test)
+// Inerte nel browser (module non definito nel renderer).
+// ============================================================
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getGaugeColor,
+    parseAgentDue,
+    fmtUpcomingCountdown,
+    fmtUpcomingDay
+  };
+}

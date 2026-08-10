@@ -88,6 +88,18 @@
           <div class="nav-icon"><i class="fab fa-youtube"></i></div>
           <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
         </div>
+
+        <div class="nav-rail-divider"></div>
+        <div class="nav-rail-section-label">COMM</div>
+
+        <div class="nav-rail-item" onclick="window.location.href='hotline.html'">
+          <div class="nav-icon"><i class="fas fa-phone"></i></div>
+          <div class="nav-label"><span class="nav-label-main">CALL_HOTLINE</span><span class="nav-label-sub">Telefono → AI</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='proximity.html'">
+          <div class="nav-icon"><i class="fas fa-broadcast-tower"></i></div>
+          <div class="nav-label"><span class="nav-label-main">PROXIMITY_NEARBY</span><span class="nav-label-sub">BLE & Auto-Unlock</span></div>
+        </div>
       </div>
       <div class="nav-rail-footer">
         <div class="nav-rail-item" style="opacity:0.4;cursor:default;">
@@ -149,6 +161,13 @@
           </div>
 
           <div id="globe-default-controls">
+
+            <div class="telemetry-card">
+              <div class="card-header"><span>CITY_DATABASE</span><span class="sub-header-telemetry" id="globe-db-count">SCANNING...</span></div>
+              <input type="text" id="globe-city-search" class="globe-city-search" placeholder="SEARCH CITY / COUNTRY..." autocomplete="off" />
+              <div id="globe-city-results" class="globe-city-results hidden"></div>
+            </div>
+
             <div class="telemetry-card">
               <div class="card-header"><span>SATELLITE ROTATION</span></div>
               <button class="hud-action-btn active" id="btn-globe-rotate">
@@ -177,30 +196,58 @@
                 <span id="city-detail-name">---</span>
                 <span id="city-detail-time">--:--</span>
               </div>
+              <div class="card-header" style="border:none;padding:0 0 2px 0;">
+                <span class="sub-header-telemetry" id="city-detail-date">---</span>
+                <span class="cd-dn-badge" id="city-detail-dn">DAYTIME</span>
+              </div>
               <div class="city-detail-body">
                 <div class="city-detail-icon-temp">
                   <span id="city-detail-icon"><i class="fas fa-globe"></i></span>
-                  <span id="city-detail-temp">--°C</span>
+                  <div class="city-detail-temp-right">
+                    <span id="city-detail-temp">--°C</span>
+                  </div>
                 </div>
                 <div class="city-detail-desc" id="city-detail-desc">---</div>
                 <div class="city-detail-stats">
+                  <div class="cd-stat">
+                    <span class="cd-label">FEELS LIKE</span>
+                    <span class="cd-value" id="city-detail-feels">--°C</span>
+                  </div>
                   <div class="cd-stat">
                     <span class="cd-label">HUMIDITY</span>
                     <span class="cd-value" id="city-detail-humidity">--%</span>
                   </div>
                   <div class="cd-stat">
                     <span class="cd-label">WIND</span>
-                    <span class="cd-value" id="city-detail-wind">-- km/h</span>
+                    <span class="cd-value" id="city-detail-wind">--</span>
+                  </div>
+                  <div class="cd-stat">
+                    <span class="cd-label">PRESSURE</span>
+                    <span class="cd-value" id="city-detail-pressure">--</span>
+                  </div>
+                  <div class="cd-stat">
+                    <span class="cd-label">UV INDEX</span>
+                    <span class="cd-value" id="city-detail-uv">--</span>
+                  </div>
+                  <div class="cd-stat">
+                    <span class="cd-label">COORDS</span>
+                    <span class="cd-value" id="city-detail-coords">--</span>
+                  </div>
+                  <div class="cd-stat">
+                    <span class="cd-label">SUNRISE</span>
+                    <span class="cd-value" id="city-detail-sunrise">--:--</span>
+                  </div>
+                  <div class="cd-stat">
+                    <span class="cd-label">SUNSET</span>
+                    <span class="cd-value" id="city-detail-sunset">--:--</span>
                   </div>
                   <div class="cd-stat">
                     <span class="cd-label">TIMEZONE</span>
                     <span class="cd-value" id="city-detail-tz">---</span>
                   </div>
-                  <div class="cd-stat">
-                    <span class="cd-label">COORDS</span>
-                    <span class="cd-value" id="city-detail-coords">--°N, --°E</span>
-                  </div>
                 </div>
+                <div class="city-miniforecast-title">CITY_7DAY_FORECAST</div>
+                <div id="city-forecast" class="forecast-days"></div>
               </div>
               <button class="hud-action-btn" id="btn-city-back">
                 <span class="indicator"></span> BACK TO GLOBAL VIEW
@@ -283,5 +330,6 @@
 
   <script src="shared.js"></script>
   <script src="globe.js"></script>
+  <script src="nav-windows.js"></script>
 </body>
 </html>
