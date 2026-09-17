@@ -8,6 +8,7 @@ export interface ProjectConfig {
   name: string;
   path: string;
   aliases: string[];
+  selfHeal?: boolean; // opt-in Fase 4 estesa: se true, errori ricorrenti su questo progetto attivano self-healing sul PROGETTO stesso (branch+PR)
 }
 
 export interface ProjectsFile {

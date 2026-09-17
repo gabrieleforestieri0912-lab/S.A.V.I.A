@@ -142,17 +142,29 @@ type ThresholdCallback = (event: ThresholdEvent) => Promise<void> | void;
 class HealthMonitor {
   private state: HealthState = loadState();
   private thresholdCb: ThresholdCallback | null = null;
+  private managedThresholdCb: ((event: ThresholdEvent, projectName: string) => Promise<void> | void) | null = null;
 
   onThreshold(cb: ThresholdCallback): void {
     this.thresholdCb = cb;
   }
 
-  recordError(rawError: unknown, scope: HealthScope = "core", extra?: { fileHint?: string }): ThresholdEvent | null {
-    if (scope !== "core") {
-      // managed project errors: log only, never heal
-      const msg = rawError instanceof Error ? rawError.message : String(rawError);
-      log({ level: "warn", event: "managed_error_ignored_for_healing", error: redactSecrets(msg).slice(0, 500) });
-      return null;
+  onManagedThreshold(cb: (event: ThresholdEvent, projectName: string) => Promise<void> | void): void {
+    this.managedThresholdCb = cb;
+  }
+
+  recordError(rawError: unknown, scope: HealthScope = "core", extra?: { fileHint?: string; projectName?: string }): ThresholdEvent | null {
+    if (scope === "managed") {
+      const projectName = extra?.projectName || "unknown";
+      // caller (executor) ha già verificato opt-in selfHeal; qui registra direttamente
+      const rawMessageManaged = rawError instanceof Error ? (rawError.stack || rawError.message) : String(rawError);
+      const redactedM = redactSecrets(rawMessageManaged);
+      if (isExcludedFromHealing(redactedM)) {
+        log({ level: "warn", event: "managed_excluded_no_heal", error: projectName });
+        return null;
+      }
+      const normalizedM = normalizeSignature(redactedM);
+      const signatureM = `managed:${projectName}:${normalizedM}`;
+      return this.recordWithSignature(signatureM, redactedM, normalizedM, true, projectName);
     }
 
     const rawMessage = rawError instanceof Error ? (rawError.stack || rawError.message) : String(rawError);
@@ -243,6 +255,76 @@ class HealthMonitor {
     }
 
     log({ level: "warn", event: "error_recorded", error: `${signature} (${rec.occurrences.length}/${THRESHOLD_COUNT})` });
+    return null;
+  }
+
+  private recordWithSignature(signature: string, redacted: string, normalized: string, isManaged: boolean, projectName?: string): ThresholdEvent | null {
+    const now = new Date();
+    const iso = now.toISOString();
+    const rec = this.state.errors[signature] || {
+      signature,
+      rawMessage: redacted.slice(0, 2000),
+      normalizedMessage: normalized,
+      count: 0,
+      firstSeen: iso,
+      lastSeen: iso,
+      occurrences: [],
+      pendingPrUrl: null,
+      disabled: false,
+    };
+    if (rec.disabled) {
+      const until = rec.disabledUntil ? new Date(rec.disabledUntil).getTime() : 0;
+      if (until && Date.now() < until) {
+        rec.occurrences.push(iso);
+        rec.lastSeen = iso;
+        this.state.errors[signature] = rec;
+        saveState(this.state);
+        return null;
+      } else if (rec.disabled) {
+        rec.disabled = false;
+        rec.disabledUntil = null;
+        rec.disabledReason = null;
+      }
+    }
+    rec.count += 1;
+    rec.lastSeen = iso;
+    rec.rawMessage = redacted.slice(0, 2000);
+    rec.occurrences.push(iso);
+    const windowStart = now.getTime() - THRESHOLD_WINDOW_MS;
+    rec.occurrences = rec.occurrences.filter((ts) => new Date(ts).getTime() >= windowStart);
+    rec.count = rec.occurrences.length;
+    if (rec.occurrences.length === 1) rec.firstSeen = iso;
+    if (rec.pendingPrUrl) {
+      this.state.errors[signature] = rec;
+      saveState(this.state);
+      log({ level: "warn", event: "duplicate_heal_suppressed", error: `${signature} -> pending ${rec.pendingPrUrl}` });
+      return null;
+    }
+    // managed: allow up to 1 pending per project, but global cap still 2
+    if (this.state.globalPendingCount >= MAX_GLOBAL_PENDING) {
+      this.state.errors[signature] = rec;
+      saveState(this.state);
+      log({ level: "warn", event: "global_heal_cap_reached", error: signature });
+      return null;
+    }
+    this.state.errors[signature] = rec;
+    saveState(this.state);
+    if (rec.occurrences.length >= THRESHOLD_COUNT) {
+      const recentLogs = readRecentLogs(LOG_LINES_FOR_DIAGNOSIS);
+      const event: ThresholdEvent = { signature, record: { ...rec }, recentLogs };
+      log({ level: "error", event: isManaged ? "managed_healing_threshold_exceeded" : "healing_threshold_exceeded", error: signature });
+      if (isManaged && this.managedThresholdCb && projectName) {
+        Promise.resolve(this.managedThresholdCb(event, projectName)).catch((e) => {
+          log({ level: "error", event: "managed_threshold_callback_failed", error: String(e).slice(0, 500) });
+        });
+      } else if (!isManaged && this.thresholdCb) {
+        Promise.resolve(this.thresholdCb(event)).catch((e) => {
+          log({ level: "error", event: "threshold_callback_failed", error: String(e).slice(0, 500) });
+        });
+      }
+      return event;
+    }
+    log({ level: "warn", event: isManaged ? "managed_error_recorded" : "error_recorded", error: `${signature} (${rec.occurrences.length}/${THRESHOLD_COUNT})` });
     return null;
   }
 

@@ -10,6 +10,7 @@ import type { ExecJob } from "./executor.js";
 import { connectNotionMcp, notion } from "./notionMcp.js";
 import { healthMonitor, redactSecrets } from "./healthMonitor.js";
 import { handleSelfHeal, getSelfHealState, resetSelfHeal } from "./selfHeal.js";
+import { handleManagedHeal } from "./managedHeal.js";
 
 const LOGO_PATH = path.resolve(process.cwd(), "..", "savia.png");
 
@@ -64,9 +65,14 @@ const notifier: Notifier = {
 
 const jobQueue = new JobQueue(notifier);
 
-// ── HealthMonitor wiring (core only) ──────────────────────────────────
+// ── HealthMonitor wiring ──────────────────────────────────────────────
 healthMonitor.onThreshold(async (event) => {
   await handleSelfHeal(event, notifier);
+});
+healthMonitor.onManagedThreshold(async (event, projectName) => {
+  const proj = config.projects.find((p) => p.name === projectName);
+  if (!proj) return;
+  await handleManagedHeal(proj, event, notifier);
 });
 
 // Global crash handlers — livello 1 resilienza è PM2, qui logghiamo e tracciamo

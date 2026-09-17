@@ -198,9 +198,40 @@ Ogni crash/restart è loggato in `logs/savia.log` con timestamp (via `process.on
 - `ecosystem.config.js` — PM2 supervisor
 - `health-state.json` — stato persistito (gitignored), `logs/savia.log` — log esistente
 
+### Fase 4 estesa — Self-healing sui progetti gestiti (opt-in)
+
+Per default **disattivato**. Attivalo per singolo progetto in `projects.config.json`:
+
+```json
+{
+  "name": "curriculuxe",
+  "path": "C:\\path\\to\\curriculuxe",
+  "aliases": ["curriculuxe"],
+  "selfHeal": true
+}
+```
+
+Quando `selfHeal:true`, i fallimenti ricorrenti **dello stesso progetto** (timeout/run_failed 3/30m con stessa firma) attivano lo stesso flusso ma sul **repo del progetto** (branch `savia/self-heal/<progetto>/<ts>-<slug>` → PR sul progetto). Guardrail separati: max 1 pending per progetto, stessa redaction, mai merge automatico.
+
+### Hardening PM2 Windows
+
+```powershell
+npm i -g pm2
+npm i -g pm2-logrotate
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 7
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup  # su Windows genera task in Task Scheduler; esegui come admin il comando stampato
+# verifica: pm2 list, pm2 logs savia-bot --lines 50
+```
+
+Verifica boot: riavvia PC → `pm2 list` deve mostrare `savia-bot` online senza avvio manuale.
+
 ### Guardrail Fase 4
 
-- Mai modifiche ai progetti gestiti per errori del core (e viceversa)
+- Mai modifiche ai progetti gestiti per errori del core (e viceversa) — separazione via `scope`
 - Mai merge/restart automatico — il bot continua sul codice *attuale* finché non mergi tu
 - Esclusi a priori dal self-heal: errori di credenziali (Telegram token, OpenRouter key, `gh auth`) → solo notifica
 

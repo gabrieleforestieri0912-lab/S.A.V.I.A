@@ -5,6 +5,7 @@ import { config } from "./config.js";
 import { log } from "./logger.js";
 import * as gitOps from "./gitOps.js";
 import { checkGhAuth, getDefaultBranch, createPr } from "./prOps.js";
+import { healthMonitor } from "./healthMonitor.js";
 import type { Notifier } from "./jobQueue.js";
 
 export interface ExecJob {
@@ -164,6 +165,10 @@ export async function executeJob(job: ExecJob, notifier: Notifier): Promise<void
         await gitOps.stashChanges(repo, `savia-timeout: ${job.intentSummary}`);
       }
       await gitOps.checkoutBranch(repo, originalBranch);
+      // Managed self-healing (opt-in): traccia timeout ricorrente
+      if (job.project.selfHeal) {
+        healthMonitor.recordError(new Error(`timeout:${job.agentName}:${result.output?.slice(0, 300) || result.error || "unknown"}`), "managed", { projectName: job.project.name });
+      }
       notifier.notify(
         job.chatId,
         `⏱️ Timeout (${job.agentName}) su ${job.project.name} dopo ${Math.round(
@@ -184,6 +189,9 @@ export async function executeJob(job: ExecJob, notifier: Notifier): Promise<void
         await gitOps.stashChanges(repo, `savia-failed: ${job.intentSummary}`);
       }
       await gitOps.checkoutBranch(repo, originalBranch);
+      if (job.project.selfHeal) {
+        healthMonitor.recordError(new Error(`run_failed:${job.agentName}:${result.error?.slice(0, 300) || result.output?.slice(0, 300) || "unknown"}`), "managed", { projectName: job.project.name });
+      }
       notifier.notify(
         job.chatId,
         `❌ Esecuzione fallita (${job.agentName}) su ${job.project.name}.\n` +
