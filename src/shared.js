@@ -2,11 +2,9 @@ let soundEnabled = true;
 let overclockEnabled = true;
 let scanlinesEnabled = true;
 let aiOnline = false;
-let aiProvider = 'openrouter'; // 'openrouter' | 'opencode' | 'local'
+let aiProvider = 'openrouter'; // solo OpenRouter
 let openrouterApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
 let openrouterBaseUrl = 'https://openrouter.ai/api/v1';
-let opencodeApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
-let opencodeBaseUrl = 'https://opencode.ai/zen/v1';
 let systemLogsBuffer = [];
 
 const audioClick = document.getElementById('audio-click');

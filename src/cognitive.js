@@ -2,7 +2,6 @@
  * S.A.V.I.A - Cognitive Bridge & Chat Terminal Module
  */
 
-const LOCAL_AI_HOST = 'http://localhost:11434';
 const terminalLogs = document.getElementById('terminal-logs');
 const terminalInput = document.getElementById('terminal-input');
 const terminalForm = document.getElementById('terminal-input-form');
@@ -15,9 +14,7 @@ const systemBridgeStatus = document.getElementById('system-bridge-status');
 
 // ── Configurazione runtime (persistita in savia-config.json via IPC) ──
 function getDefaultModel() {
-  if (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter') return 'nvidia/nemotron-3.5-lightning:free';
-  if (typeof aiProvider !== 'undefined' && aiProvider === 'opencode') return 'claude-sonnet-4-5';
-  return 'mistral';
+  return 'nvidia/nemotron-3.5-lightning:free';
 }
 
 let activeModel = localStorage.getItem('savia-model') || getDefaultModel();
@@ -31,70 +28,47 @@ async function loadRuntimeConfig() {
     if (window.electronAPI && window.electronAPI.configGet) {
       const cfg = await window.electronAPI.configGet();
       if (cfg) {
-        if (cfg.aiProvider) aiProvider = cfg.aiProvider;
         if (cfg.openrouterApiKey) openrouterApiKey = cfg.openrouterApiKey;
-        if (cfg.opencodeApiKey) opencodeApiKey = cfg.opencodeApiKey;
         if (cfg.activeModel) activeModel = cfg.activeModel;
       }
     }
   } catch (e) { /* ignore */ }
-  if ((typeof aiProvider !== 'undefined' && aiProvider === 'openrouter') && (!activeModel || activeModel === 'mistral' || activeModel === 'claude-sonnet-4-5')) {
+  aiProvider = 'openrouter';
+  if (!activeModel || activeModel === 'mistral' || activeModel === 'claude-sonnet-4-5') {
     activeModel = 'nvidia/nemotron-3.5-lightning:free';
     localStorage.setItem('savia-model', activeModel);
   }
   if (window.electronAPI && window.electronAPI.configSet) {
     try {
       await window.electronAPI.configSet({
-        aiProvider: typeof aiProvider !== 'undefined' ? aiProvider : 'openrouter',
+        aiProvider: 'openrouter',
         openrouterApiKey: typeof openrouterApiKey !== 'undefined' ? openrouterApiKey : '',
-        opencodeApiKey: typeof opencodeApiKey !== 'undefined' ? opencodeApiKey : '',
         activeModel
       });
     } catch (e) { /* ignore */ }
   }
 }
 
-// Popola il selettore modello con i modelli installati su OpenRouter / OpenCode / Local
+// Popola il selettore modello con i modelli disponibili su OpenRouter
 async function refreshModelList() {
   const sel = document.getElementById('model-select');
   if (!sel) return;
   try {
-    let models = [];
-    const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
-    const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
-
-    if (isOpenRouter) {
-      const res = await fetch(`${openrouterBaseUrl}/models`, {
-        headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const all = (data.data || []).map(m => m.id);
-      const free = all.filter(m => m.endsWith(':free'));
-      const paid = all.filter(m => !m.endsWith(':free'));
-      models = [...free, ...paid];
-    } else if (isOpenCode) {
-      const res = await fetch(`${opencodeBaseUrl}/models`, {
-        headers: { 'Authorization': `Bearer ${opencodeApiKey}` }
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      models = (data.data || []).map(m => m.id);
-    } else {
-      const res = await fetch(`${LOCAL_AI_HOST}/api/tags`);
-      if (!res.ok) return;
-      const data = await res.json();
-      models = (data.models || []).map(m => m.name);
-    }
+    const res = await fetch(`${openrouterBaseUrl}/models`, {
+      headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const all = (data.data || []).map(m => m.id);
+    const free = all.filter(m => m.endsWith(':free'));
+    const paid = all.filter(m => !m.endsWith(':free'));
+    const models = [...free, ...paid];
     if (!models.length) return;
     sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
-    // Risolvi il modello attivo: se quello salvato non è installato, usa il preferito o il primo
     if (models.includes(activeModel)) {
       sel.value = activeModel;
     } else {
-      activeModel = isOpenRouter
-        ? (models.includes('nvidia/nemotron-3.5-lightning:free') ? 'nvidia/nemotron-3.5-lightning:free' : models[0])
-        : ((isOpenCode && models.includes('claude-sonnet-4-5')) ? 'claude-sonnet-4-5' : models[0]);
+      activeModel = models.includes('nvidia/nemotron-3.5-lightning:free') ? 'nvidia/nemotron-3.5-lightning:free' : models[0];
       sel.value = activeModel;
     }
     localStorage.setItem('savia-model', activeModel);
@@ -105,10 +79,7 @@ function applyModelToUI() {
   const sel = document.getElementById('model-select');
   if (sel) sel.value = activeModel;
   const modelInfo = document.getElementById('chat-model-info');
-  const providerLabel = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter')
-    ? 'OPENROUTER'
-    : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OPENCODE' : 'LOCAL');
-  if (modelInfo) modelInfo.textContent = `INTELLIGENZA: ${providerLabel} // ${activeModel.toUpperCase()}`;
+  if (modelInfo) modelInfo.textContent = `INTELLIGENZA: OPENROUTER // ${activeModel.toUpperCase()}`;
   const modelStatus = document.getElementById('model-status-text');
   if (modelStatus) modelStatus.textContent = `ACTIVE MODEL // ${activeModel.toUpperCase()}`;
 }
@@ -121,9 +92,7 @@ if (document.getElementById('model-select')) {
       window.electronAPI.configSet({ activeModel }).catch(() => {});
     }
     applyModelToUI();
-    const providerLabel = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter')
-      ? 'OpenRouter'
-      : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OpenCode' : 'Local');
+    const providerLabel = 'OpenRouter';
     addTickerEvent('agent', `Modello AI cambiato (${providerLabel}): ${activeModel}`);
   });
 }
@@ -169,25 +138,13 @@ let lastBridgeState = null;
 
 async function checkAiBridge() {
   const startTime = Date.now();
-  const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
-  const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
-  const endpointDesc = isOpenRouter ? 'OpenRouter (openrouter.ai)' : (isOpenCode ? 'OpenCode Zen (opencode.ai)' : LOCAL_AI_HOST);
-  const providerName = isOpenRouter ? 'OpenRouter' : (isOpenCode ? 'OpenCode' : 'Local');
+  const endpointDesc = 'OpenRouter (openrouter.ai)';
+  const providerName = 'OpenRouter';
   try {
-    let res;
-    if (isOpenRouter) {
-      res = await fetch(`${openrouterBaseUrl}/auth/key`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
-      });
-    } else if (isOpenCode) {
-      res = await fetch(`${opencodeBaseUrl}/models`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${opencodeApiKey}` }
-      });
-    } else {
-      res = await fetch(`${LOCAL_AI_HOST}/api/tags`, { method: 'GET' });
-    }
+    const res = await fetch(`${openrouterBaseUrl}/auth/key`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
+    });
     if (res.ok) {
       const duration = Date.now() - startTime;
       const wasOffline = !aiOnline;
@@ -272,21 +229,16 @@ loadRuntimeConfig().then(() => {
   applyModelToUI();
 });
 
-// Funzione unificata per streaming chat (OpenRouter / OpenCode Zen SSE / Local JSON lines)
+// Funzione unificata per streaming chat — solo OpenRouter
 async function streamAiChatCompletion({ messages, onToken, signal }) {
-  const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
-  const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
-
-  if (isOpenRouter || isOpenCode) {
-    const url = isOpenRouter ? `${openrouterBaseUrl}/chat/completions` : `${opencodeBaseUrl}/chat/completions`;
+  {
+    const url = `${openrouterBaseUrl}/chat/completions`;
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${isOpenRouter ? openrouterApiKey : opencodeApiKey}`
+      'Authorization': `Bearer ${openrouterApiKey}`,
+      'HTTP-Referer': 'https://github.com/savia',
+      'X-Title': 'S.A.V.I.A'
     };
-    if (isOpenRouter) {
-      headers['HTTP-Referer'] = 'https://github.com/savia';
-      headers['X-Title'] = 'S.A.V.I.A';
-    }
 
     const response = await fetch(url, {
       method: 'POST',
@@ -314,10 +266,7 @@ async function streamAiChatCompletion({ messages, onToken, signal }) {
         errText = await response.text();
       }
 
-      if (isOpenCode && response.status === 401 && (errText.includes('payment method') || errText.includes('CreditsError'))) {
-        throw new Error(`OpenCode Zen: Nessun metodo di pagamento associato al workspace. Aggiungi crediti o un metodo di pagamento su https://opencode.ai/workspace/wrk_01M1BPS5DBX6H5ZHGR2YPPMCFP/billing`);
-      }
-      throw new Error(`${isOpenRouter ? 'OpenRouter' : 'OpenCode'} API error (${response.status}): ${errText}`);
+      throw new Error(`OpenRouter API error (${response.status}): ${errText}`);
     }
 
     const reader = response.body.getReader();
@@ -359,61 +308,6 @@ async function streamAiChatCompletion({ messages, onToken, signal }) {
           const delta = jsonChunk.choices?.[0]?.delta?.content;
           if (delta) onToken(delta);
         } catch (e) {}
-      }
-    } finally {
-      streamActive = false;
-    }
-
-  } else {
-    // Local AI streaming
-    const response = await fetch(`${LOCAL_AI_HOST}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: getActiveModel(),
-        messages,
-        stream: true
-      }),
-      signal
-    });
-
-    if (!response.ok) throw new Error('Model streaming connection failure');
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    streamActive = true;
-
-    try {
-      while (true) {
-        await waitIfStandby();
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const jsonChunk = JSON.parse(line);
-            if (jsonChunk.message && jsonChunk.message.content) {
-              onToken(jsonChunk.message.content);
-            }
-          } catch (jsonErr) {
-            console.error('Buffer parse breakdown:', jsonErr);
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        try {
-          const jsonChunk = JSON.parse(buffer);
-          if (jsonChunk.message && jsonChunk.message.content) {
-            onToken(jsonChunk.message.content);
-          }
-        } catch(e) {}
       }
     } finally {
       streamActive = false;
@@ -653,7 +547,7 @@ terminalForm.addEventListener('submit', async (e) => {
 
       appendLogMessage('sys_err',
         `COGNITIVE BRIDGE UNREACHABLE.<br><br>` +
-        `Connection to AI provider on <span style="color:var(--accent-cyan); font-weight:bold;">${LOCAL_AI_HOST}</span> failed.<br>` +
+        `Connection to AI provider on <span style="color:var(--accent-cyan); font-weight:bold;">OpenRouter</span> failed.<br>` +
         `Please verify that the AI service is active and the model is available.<br><br>` +
         `Initialize the cognitive core by checking your AI provider configuration.<br>` +
         `<span class="ai-command-hint">Check AI provider settings</span>`,

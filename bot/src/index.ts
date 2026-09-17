@@ -14,7 +14,7 @@ const LOGO_PATH = path.resolve(process.cwd(), "..", "savia.png");
 function validateConfig(): void {
   const missing: string[] = [];
   if (!config.telegramBotToken) missing.push("TELEGRAM_BOT_TOKEN");
-  if (!config.geminiApiKey) missing.push("GEMINI_API_KEY");
+  if (!config.openrouterApiKey) missing.push("OPENROUTER_API_KEY");
   if (!config.allowedChatId) missing.push("ALLOWED_CHAT_ID");
 
   if (missing.length > 0) {

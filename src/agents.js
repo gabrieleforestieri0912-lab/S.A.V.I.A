@@ -139,69 +139,30 @@ Esempi:
 "Crea un logo" → creativo
 "Come stai?" → auto`;
 
-    const model = typeof getActiveModel === 'function' ? getActiveModel() : (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter' ? 'nvidia/nemotron-3.5-lightning:free' : (typeof aiProvider !== 'undefined' && aiProvider === 'opencode' ? 'claude-sonnet-4-5' : 'local-model'));
+    const model = typeof getActiveModel === 'function' ? getActiveModel() : 'nvidia/nemotron-3.5-lightning:free';
     let cls = '';
 
-    if (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter') {
-      const res = await fetch(`${openrouterBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openrouterApiKey}`,
-          'HTTP-Referer': 'https://github.com/savia',
-          'X-Title': 'S.A.V.I.A'
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: promptSystem },
-            { role: 'user', content: query }
-          ],
-          max_tokens: 15,
-          stream: false
-        })
-      });
-      if (!res.ok) return 'auto';
-      const data = await res.json();
-      cls = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
-    } else if (typeof aiProvider !== 'undefined' && aiProvider === 'opencode') {
-      const res = await fetch(`${opencodeBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${opencodeApiKey}`
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: promptSystem },
-            { role: 'user', content: query }
-          ],
-          max_tokens: 15,
-          stream: false
-        })
-      });
-      if (!res.ok) return 'auto';
-      const data = await res.json();
-      cls = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
-    } else {
-      const localHost = (typeof LOCAL_AI_HOST !== 'undefined' ? LOCAL_AI_HOST : 'http://localhost:11434');
-      const res = await fetch(`${localHost}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: promptSystem },
-            { role: 'user', content: query }
-          ],
-          stream: false
-        })
-      });
-      if (!res.ok) return 'auto';
-      const data = await res.json();
-      cls = (data.message?.content || '').trim().toLowerCase();
-    }
+    const res = await fetch(`${openrouterBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openrouterApiKey}`,
+        'HTTP-Referer': 'https://github.com/savia',
+        'X-Title': 'S.A.V.I.A'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: promptSystem },
+          { role: 'user', content: query }
+        ],
+        max_tokens: 15,
+        stream: false
+      })
+    });
+    if (!res.ok) return 'auto';
+    const data = await res.json();
+    cls = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
 
     return ['tecnico', 'ricercatore', 'organizzatore', 'creativo', 'auto'].includes(cls) ? cls : 'auto';
   } catch {

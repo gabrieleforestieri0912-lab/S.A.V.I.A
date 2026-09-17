@@ -1,7 +1,7 @@
 {
   "name": "savia-remote-control",
   "version": "1.0.0",
-  "description": "S.A.V.I.A — Second Brain Remote Control (Fase 1): Telegram bot that parses natural-language commands via Claude.",
+  "description": "S.A.V.I.A — Second Brain Remote Control: Telegram bot that parses natural-language commands via OpenRouter.",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "dotenv": "^16.4.5",
     "node-pty": "^1.1.0",

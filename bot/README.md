@@ -1,13 +1,13 @@
 # S.A.V.I.A — Second Brain Remote Control
 
 Bot Telegram (Node.js + TypeScript) che riceve messaggi in linguaggio naturale,
-li interpreta tramite Gemini (Google Generative AI) e — dalla Fase 2 — esegue realmente
+li interpreta tramite **OpenRouter** (stessa chiave di S.A.V.I.A) e — dalla Fase 2 — esegue realmente
 l'agente di coding richiesto (OpenCode) su un branch Git dedicato.
 
 ## Prerequisiti
 - Node.js 18+ (testato con v25)
 - Un bot Telegram creato via [BotFather](https://t.me/BotFather)
-- Una API key Gemini (`GEMINI_API_KEY`)
+- La tua chiave **OpenRouter** (`OPENROUTER_API_KEY` — la stessa già usata in S.A.V.I.A → `savia-config.json`)
 - `opencode` installato e raggiungibile da PATH (agente primario)
 - `git` installato (simple-git lo invoca)
 - `gh` CLI installata e autenticata (`gh auth login`) — per l'apertura della PR (Fase 3).
@@ -28,14 +28,14 @@ l'agente di coding richiesto (OpenCode) su un branch Git dedicato.
    Copy-Item .env.example .env.local
    ```
 
-   `.env.local`:
-   ```
-   TELEGRAM_BOT_TOKEN=il_tuo_token
-   GEMINI_API_KEY=la_tua_key
-   ALLOWED_CHAT_ID=il_tuo_chat_id
-   GEMINI_MODEL=gemini-2.5-flash
-   AGENT_TIMEOUT_MS=600000
-   ```
+    `.env.local`:
+    ```
+    TELEGRAM_BOT_TOKEN=il_tuo_token
+    OPENROUTER_API_KEY=la_stessa_chiave_di_savia-config.json
+    ALLOWED_CHAT_ID=il_tuo_chat_id
+    OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free
+    AGENT_TIMEOUT_MS=600000
+    ```
 
 4. Compila `projects.config.json` con i tuoi progetti reali (i percorsi devono essere
    repository Git puliti prima di lanciare un task).
@@ -146,7 +146,7 @@ Ho verificato i CLI sul sistema al momento dello sviluppo:
 ## Struttura
 - `src/index.ts` — entry point: bot Telegram, whitelist, routing, coda
 - `src/config.ts` — caricamento env e `projects.config.json`
-- `src/parser.ts` — chiamata a Claude e parsing del JSON di risposta
+- `src/parser.ts` — chiamata a OpenRouter e parsing del JSON di risposta
 - `src/agents/` — `AgentRunner`, `OpenCodeRunner`, `FreeBuffRunner`
 - `src/gitOps.ts` — operazioni Git (clean check, branch, commit, push, stash, cleanup)
 - `src/prOps.ts` — interazione con `gh` (auth check, default branch, creazione PR)

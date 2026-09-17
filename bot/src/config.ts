@@ -16,9 +16,9 @@ export interface ProjectsFile {
 
 export interface AppConfig {
   telegramBotToken: string;
-  geminiApiKey: string;
+  openrouterApiKey: string;
   allowedChatId: string;
-  geminiModel: string;
+  openrouterModel: string;
   agentTimeoutMs: number;
   freebuffStartupMs: number;
   freebuffQuietMs: number;
@@ -39,9 +39,9 @@ function loadProjects(): ProjectConfig[] {
 
 export const config: AppConfig = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
-  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  openrouterApiKey: process.env.OPENROUTER_API_KEY ?? "",
   allowedChatId: (process.env.ALLOWED_CHAT_ID ?? "").trim(),
-  geminiModel: process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+  openrouterModel: process.env.OPENROUTER_MODEL?.trim() || "nvidia/nemotron-3.5-lightning:free",
   agentTimeoutMs: Number(process.env.AGENT_TIMEOUT_MS) || 600000,
   freebuffStartupMs: Number(process.env.FREEBUFF_STARTUP_MS) || 3000,
   freebuffQuietMs: Number(process.env.FREEBUFF_QUIET_MS) || 3000,

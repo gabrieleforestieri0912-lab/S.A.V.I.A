@@ -1,8 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "./config.js";
 import type { ParseResult } from "./types.js";
-
-const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
 const SYSTEM_PROMPT = `Sei il modulo di parsing di S.A.V.I.A, un sistema che interpreta comandi in linguaggio naturale per pilotare agenti di coding su progetti locali.
 
@@ -60,22 +57,41 @@ function normalize(obj: Record<string, unknown>): ParseResult {
 }
 
 export async function parseMessage(text: string): Promise<ParseResult> {
-  const model = genAI.getGenerativeModel({
-    model: config.geminiModel,
-    systemInstruction: SYSTEM_PROMPT,
-    generationConfig: {
-      responseMimeType: "application/json",
-      maxOutputTokens: 1024,
-    },
-  });
+  if (!config.openrouterApiKey) throw new Error("OPENROUTER_API_KEY non configurata");
 
   const projectsList = config.projects.map((p) => ({ name: p.name, aliases: p.aliases }));
   const userContent =
     `PROGETTI DISPONIBILI:\n${JSON.stringify(projectsList, null, 2)}\n\n` +
     `MESSAGGIO DELL'UTENTE:\n${text}`;
 
-  const response = await model.generateContent(userContent);
-  const raw = response.response.text();
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.openrouterApiKey}`,
+      "HTTP-Referer": "https://github.com/savia",
+      "X-Title": "S.A.V.I.A Bot",
+    },
+    body: JSON.stringify({
+      model: config.openrouterModel,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.2,
+      max_tokens: 1024,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`OpenRouter error ${res.status}: ${err.slice(0, 500)}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const raw = data.choices?.[0]?.message?.content ?? "";
 
   const jsonString = extractJson(raw);
   let parsed: unknown;
