@@ -123,14 +123,7 @@ function classifyByKeywords(query) {
 async function classifyWithLLM(query) {
   if (typeof ollamaOnline === 'undefined' || !ollamaOnline) return 'auto';
   try {
-    const res = await fetch('http://localhost:11434/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: typeof getActiveModel === 'function' ? getActiveModel() : 'mistral',
-        messages: [{
-          role: 'system',
-          content: `Classifica il messaggio utente in UNA di queste categorie. Rispondi SOLO con il nome della categoria, senza altro testo.
+    const promptSystem = `Classifica il messaggio utente in UNA di queste categorie. Rispondi SOLO con il nome della categoria, senza altro testo.
 
 Categorie:
 - tecnico: programmazione, debug, comandi sistema, codice, file, terminale
@@ -144,16 +137,71 @@ Esempi:
 "Cerca informazioni sul clima" → ricercatore
 "Organizza la mia settimana" → organizzatore
 "Crea un logo" → creativo
-"Come stai?" → auto`
-        }, {
-          role: 'user', content: query
-        }],
-        stream: false
-      })
-    });
-    if (!res.ok) return 'auto';
-    const data = await res.json();
-    const cls = (data.message?.content || '').trim().toLowerCase();
+"Come stai?" → auto`;
+
+    const model = typeof getActiveModel === 'function' ? getActiveModel() : (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter' ? 'nvidia/nemotron-3.5-lightning:free' : (typeof aiProvider !== 'undefined' && aiProvider === 'opencode' ? 'claude-sonnet-4-5' : 'mistral'));
+    let cls = '';
+
+    if (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter') {
+      const res = await fetch(`${openrouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openrouterApiKey}`,
+          'HTTP-Referer': 'https://github.com/savia',
+          'X-Title': 'S.A.V.I.A'
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: promptSystem },
+            { role: 'user', content: query }
+          ],
+          max_tokens: 15,
+          stream: false
+        })
+      });
+      if (!res.ok) return 'auto';
+      const data = await res.json();
+      cls = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
+    } else if (typeof aiProvider !== 'undefined' && aiProvider === 'opencode') {
+      const res = await fetch(`${opencodeBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${opencodeApiKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: promptSystem },
+            { role: 'user', content: query }
+          ],
+          max_tokens: 15,
+          stream: false
+        })
+      });
+      if (!res.ok) return 'auto';
+      const data = await res.json();
+      cls = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
+    } else {
+      const res = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: promptSystem },
+            { role: 'user', content: query }
+          ],
+          stream: false
+        })
+      });
+      if (!res.ok) return 'auto';
+      const data = await res.json();
+      cls = (data.message?.content || '').trim().toLowerCase();
+    }
+
     return ['tecnico', 'ricercatore', 'organizzatore', 'creativo', 'auto'].includes(cls) ? cls : 'auto';
   } catch {
     return 'auto';
@@ -178,7 +226,7 @@ async function routeQuery(query) {
 }
 
 function getAgentPrompt() {
-  const base = 'You are S.A.V.I.A., a cybernetic AI assistant modeled after JARVIS. Reply to the user in the language they use. Use a sophisticated, professional, sharp tone. Concise responses for a cyberpunk HUD.\n\n' +
+  const base = 'You are S.A.V.I.A. (Smart Artificial Virtual Intelligence Assistant), a cybernetic AI assistant modeled after JARVIS. Reply to the user in the language they use. Use a sophisticated, professional, sharp tone. Concise responses for a cyberpunk HUD.\n\n' +
     'You can execute actions in the interface by writing [ACTION:action_name] in the response. Never list the available actions to the user, just use them.\n' +
     'Azioni disponibili:\n' +
     '- navigate_index, navigate_particles, navigate_terminal, navigate_knowledge, navigate_globe\n' +
@@ -186,9 +234,18 @@ function getAgentPrompt() {
     '- toggle_wake, toggle_continuous, toggle_autospeak\n' +
     '- toggle_globe_rotate, globe_global_view, toggle_globe_gestures, globe_city_back\n' +
     '- toggle_particles_rotate, toggle_particles_gestures\n' +
+    '- particles_creation_mode, particles_physics, particles_wireframe\n' +
+    '- particles_reset_scene, particles_screenshot\n' +
+    '- particles_gesture_rotate, particles_gesture_create, particles_gesture_delete, particles_gesture_move\n' +
     '- terminal_clear, terminal_kill, fb_refresh, fb_back, fb_forward, fb_up\n' +
     '- navigate_objectives, navigate_calendar, navigate_imagine, navigate_youtube, yt_search\n' +
+    '- yt_playlist_add, yt_playlist_remove, yt_subscribe, yt_analyze\n' +
+    '- navigate_news\n' +
+    '- navigate_mcp\n' +
     '- kb_index, memory_scan_projects, open_logs\n\n';
+
+  const mcpDocs = (typeof window !== 'undefined' && window.MCP_TOOL_DOCS) ? window.MCP_TOOL_DOCS : '';
+  if (mcpDocs) base += '\nSTRUMENTI MCP DISPONIBILI (usa [TOOL] mcp:<serverId>|<toolName>|<jsonArgs>):\n' + mcpDocs + '\n';
 
   if (currentAgentId === 'auto' || !AGENTS[currentAgentId]) {
     return base +
@@ -211,7 +268,8 @@ function parseAgentTools(text) {
     reminder: /\[TOOL\]\s*reminder\s*:\s*(.+)/i,
     imagine: /\[TOOL\]\s*imagine\s*:\s*(.+)/i,
     notify: /\[TOOL\]\s*notify\s*:\s*(.+)/i,
-    kbsearch: /\[TOOL\]\s*kbsearch\s*:\s*(.+)/i
+    kbsearch: /\[TOOL\]\s*kbsearch\s*:\s*(.+)/i,
+    mcp: /\[TOOL\]\s*mcp\s*:\s*(.+)/i
   };
 
   for (const [tool, regex] of Object.entries(toolMap)) {
@@ -304,6 +362,19 @@ async function executeAgentTool(text) {
         return `Notification sent: ${text}`;
       }
       return `[NOTIFY] ${cmd.args}`;
+    case 'mcp': {
+      const parts = cmd.args.trim().split(/\s+/);
+      const serverId = parts[0] || '';
+      const tool = parts[1] || '';
+      const jsonArgs = parts.slice(2).join(' ') || '{}';
+      if (!serverId || !tool) return '[MCP] Formato atteso: mcp:<serverId> <toolName> <json>';
+      if (window.electronAPI && window.electronAPI.mcpCallTool) {
+        const res = await window.electronAPI.mcpCallTool({ serverId, tool, args: jsonArgs });
+        appendLogMessage('tool', `[MCP:${tool}] ${res.ok ? (res.result || 'ok') : res.error}`, 'tool');
+        return res.ok ? res.result : `[MCP ERROR] ${res.error}`;
+      }
+      return '[MCP] bridge non disponibile';
+    }
     default:
       return null;
   }

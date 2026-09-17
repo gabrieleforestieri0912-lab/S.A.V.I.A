@@ -135,17 +135,6 @@ function escapeHtml(t) {
   return el.innerHTML;
 }
 
-// Semantic search tool for agents
-async function kbSemanticSearch(query, limit = 5) {
-  try {
-    const res = await window.electronAPI.kbSearch({ query, limit });
-    if (!res.success || !res.results.length) return null;
-    return res.results.map(r =>
-      `[${r.filename} (${(r.score * 100).toFixed(0)}%)] ${r.text.substring(0, 300)}`
-    ).join('\n\n');
-  } catch { return null; }
-}
-
 function initKB() {
   kbRefreshStatus();
   kbRenderDocumentList();

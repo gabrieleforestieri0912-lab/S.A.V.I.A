@@ -412,3 +412,25 @@ if (document.readyState === 'complete') {
 } else {
   window.addEventListener('load', init);
 }
+
+// ── Apertura scheda/finestra: attiva le animazioni (html.savia-open)
+// quando la finestra diventa visibile → l'entrata è visibile in ogni pagina.
+(function () {
+  function triggerOpenAnim() {
+    var root = document.documentElement;
+    root.classList.remove('savia-open');
+    void root.offsetWidth;
+    root.classList.add('savia-open');
+  }
+  function onVisible() {
+    if (document.visibilityState === 'visible') triggerOpenAnim();
+  }
+  document.addEventListener('visibilitychange', onVisible);
+  if (document.visibilityState === 'visible') {
+    if (document.readyState === 'complete') {
+      setTimeout(triggerOpenAnim, 60);
+    } else {
+      window.addEventListener('load', function () { setTimeout(triggerOpenAnim, 60); });
+    }
+  }
+})();

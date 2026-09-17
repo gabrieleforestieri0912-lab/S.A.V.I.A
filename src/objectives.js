@@ -2,10 +2,8 @@
  * S.A.V.I.A - Objectives Hub (Goals, Daily Summary, Notion Sync)
  */
 
-const NOTION_API = 'https://api.notion.com/v1';
-const NOTION_VERSION = '2022-06-28';
-
-let notionKey = localStorage.getItem('notion-api-key') || '';
+// Notion è raggiunto tramite un server MCP (es. @notionhq/notion-mcp-server).
+// Nessuna API key locale: l'autenticazione vive nella configurazione del server MCP.
 let notionDbGoals = localStorage.getItem('notion-db-goals') || '';
 let notionDbDaily = localStorage.getItem('notion-db-daily') || '';
 
@@ -27,7 +25,7 @@ const statGoals = document.getElementById('obj-stat-goals');
 const statDone = document.getElementById('obj-stat-done');
 const notionStatusText = document.getElementById('notion-status-text');
 const notionStatusDot = document.getElementById('notion-status-dot');
-const notionKeyInput = document.getElementById('obj-notion-key');
+const notionServerSelect = document.getElementById('obj-notion-server');
 const notionDbGoalsInput = document.getElementById('obj-notion-db-goals');
 const notionDbDailyInput = document.getElementById('obj-notion-db-daily');
 const notionVerifyBtn = document.getElementById('obj-notion-verify');
@@ -60,32 +58,18 @@ function saveLocalDaily() {
   localStorage.setItem('savia-daily', JSON.stringify(dailyData));
 }
 
-// ── Notion API ────────────────────────────────────────────────
+// ── Notion (via MCP) ───────────────────────────────────────────
 
-async function notionRequest(endpoint, options = {}) {
-  if (!notionKey) throw new Error('Notion API key non configurata');
-  const res = await fetch(`${NOTION_API}${endpoint}`, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${notionKey}`,
-      'Notion-Version': NOTION_VERSION,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `Notion API: ${res.status}`);
-  }
-  return res.json();
+function notionEnabled() {
+  return !!(notionDbGoals || notionDbDaily);
 }
 
 async function notionVerifyConnection() {
-  if (!notionKey) { setNotionStatus('offline', 'API key mancante'); return false; }
   setNotionStatus('checking', 'Verifica...');
   try {
-    const data = await notionRequest('/users/me');
-    setNotionStatus('online', `Connesso come ${data.name || data.id}`);
+    const data = await SaviaNotionMCP.verify();
+    const name = (data && (data.name || data.id)) || 'Notion';
+    setNotionStatus('online', `Connesso come ${name}`);
     return true;
   } catch (e) {
     setNotionStatus('offline', `Errore: ${e.message}`);
@@ -94,26 +78,15 @@ async function notionVerifyConnection() {
 }
 
 async function notionQueryDatabase(databaseId, filter) {
-  const body = { page_size: 50 };
-  if (filter) body.filter = filter;
-  return notionRequest(`/databases/${databaseId}/query`, {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
+  return SaviaNotionMCP.queryDatabase(databaseId, filter);
 }
 
 async function notionCreatePage(databaseId, properties) {
-  return notionRequest('/pages', {
-    method: 'POST',
-    body: JSON.stringify({ parent: { database_id: databaseId }, properties })
-  });
+  return SaviaNotionMCP.createPage(databaseId, properties);
 }
 
 async function notionUpdatePage(pageId, properties) {
-  return notionRequest(`/pages/${pageId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ properties })
-  });
+  return SaviaNotionMCP.updatePage(pageId, properties);
 }
 
 function notionGoalToProperties(goal, type) {
@@ -125,59 +98,11 @@ function notionGoalToProperties(goal, type) {
   };
 }
 
-function notionPropertiesToGoal(properties, id) {
-  return {
-    id,
-    text: properties.Name?.title?.[0]?.text?.content || '',
-    done: properties.Status?.select?.name === 'Done',
-    type: properties.Type?.select?.name || 'shortTerm',
-    created: properties.Created?.date?.start || ''
-  };
-}
-
 function notionDailyToProperties(text, date) {
   return {
     Date: { title: [{ text: { content: date } }] },
     Summary: { rich_text: [{ text: { content: text } }] }
   };
-}
-
-function notionPropertiesToDaily(properties) {
-  return {
-    date: properties.Date?.title?.[0]?.text?.content || '',
-    summary: properties.Summary?.rich_text?.map(r => r.text?.content).join('') || ''
-  };
-}
-
-async function syncGoalsFromNotion() {
-  if (!notionDbGoals) return;
-  try {
-    const data = await notionQueryDatabase(notionDbGoals);
-    const shortTerm = [];
-    const longTerm = [];
-    for (const page of data.results) {
-      const goal = notionPropertiesToGoal(page.properties, page.id);
-      if (goal.type === 'longTerm') longTerm.push(goal);
-      else shortTerm.push(goal);
-    }
-    goalsData = { shortTerm, longTerm };
-    saveLocalGoals();
-    renderGoals();
-  } catch (e) {
-    addLog(`Sync goals fallito: ${e.message}`);
-  }
-}
-
-async function syncDailyFromNotion() {
-  if (!notionDbDaily) return;
-  try {
-    const data = await notionQueryDatabase(notionDbDaily);
-    dailyData.summaries = data.results.map(p => notionPropertiesToDaily(p.properties));
-    saveLocalDaily();
-    renderDaily();
-  } catch (e) {
-    addLog(`Sync daily fallito: ${e.message}`);
-  }
 }
 
 // ── Goals CRUD ────────────────────────────────────────────────
@@ -248,7 +173,7 @@ function deleteGoal(id, type) {
 }
 
 async function pushToNotion(goal, type) {
-  if (!notionDbGoals || !notionKey) return;
+  if (!notionDbGoals) return;
   try {
     const data = await notionCreatePage(notionDbGoals, notionGoalToProperties(goal, type));
     goal.id = data.id;
@@ -259,7 +184,7 @@ async function pushToNotion(goal, type) {
 }
 
 async function updateNotionGoal(goal, type) {
-  if (!notionDbGoals || !notionKey) return;
+  if (!notionDbGoals) return;
   if (!goal.id || goal.id.length < 10) return;
   try {
     await notionUpdatePage(goal.id, notionGoalToProperties(goal, type));
@@ -301,7 +226,7 @@ async function saveDailySummary() {
   renderDaily();
   dailyInput.value = '';
 
-  if (notionDbDaily && notionKey) {
+  if (notionDbDaily) {
     try {
       if (existing >= 0) {
         const data = await notionQueryDatabase(notionDbDaily, {
@@ -322,28 +247,48 @@ async function saveDailySummary() {
   }
 }
 
-// ── Notion Config ─────────────────────────────────────────────
+// ── Notion Config (via MCP) ───────────────────────────────────
 
-function loadNotionConfig() {
-  notionKey = localStorage.getItem('notion-api-key') || '';
+async function refreshNotionServers() {
+  if (!notionServerSelect) return;
+  const servers = await SaviaNotionMCP.listServers();
+  const prev = notionServerSelect.value;
+  notionServerSelect.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = '';
+  auto.textContent = '— auto-detect (server con tool notion_*) —';
+  notionServerSelect.appendChild(auto);
+  for (const s of servers) {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = `${s.name} [${s.status === 'on' ? 'ON' : s.status}]`;
+    notionServerSelect.appendChild(o);
+  }
+  const selected = localStorage.getItem('notion-mcp-server-id') || (await SaviaNotionMCP.resolveServerId()) || prev;
+  notionServerSelect.value = selected || '';
+}
+
+async function loadNotionConfig() {
   notionDbGoals = localStorage.getItem('notion-db-goals') || '';
   notionDbDaily = localStorage.getItem('notion-db-daily') || '';
-  if (notionKeyInput) notionKeyInput.value = notionKey;
+  await refreshNotionServers();
   if (notionDbGoalsInput) notionDbGoalsInput.value = notionDbGoals;
   if (notionDbDailyInput) notionDbDailyInput.value = notionDbDaily;
-  if (notionKey) notionVerifyConnection();
-  else setNotionStatus('offline', 'Non configurato');
+  const sid = await SaviaNotionMCP.resolveServerId();
+  if (sid) notionVerifyConnection();
+  else setNotionStatus('offline', 'Server MCP Notion non selezionato');
 }
 
 function saveNotionConfig() {
-  notionKey = notionKeyInput?.value?.trim() || '';
   notionDbGoals = notionDbGoalsInput?.value?.trim() || '';
   notionDbDaily = notionDbDailyInput?.value?.trim() || '';
-  localStorage.setItem('notion-api-key', notionKey);
   localStorage.setItem('notion-db-goals', notionDbGoals);
   localStorage.setItem('notion-db-daily', notionDbDaily);
+  const sid = notionServerSelect?.value?.trim() || '';
+  SaviaNotionMCP.setServerId(sid);
   addLog('Configurazione Notion salvata.');
-  if (notionKey) notionVerifyConnection();
+  if (sid) notionVerifyConnection();
+  else setNotionStatus('offline', 'Server MCP Notion non selezionato');
 }
 
 function setNotionStatus(state, text) {
@@ -413,9 +358,10 @@ if (dailyInput) {
 
 if (notionVerifyBtn) {
   notionVerifyBtn.addEventListener('click', () => {
-    notionKey = notionKeyInput?.value?.trim() || '';
     notionDbGoals = notionDbGoalsInput?.value?.trim() || '';
     notionDbDaily = notionDbDailyInput?.value?.trim() || '';
+    const sid = notionServerSelect?.value?.trim() || '';
+    SaviaNotionMCP.setServerId(sid);
     notionVerifyConnection();
   });
 }
@@ -442,10 +388,10 @@ function openEditor() {
   }
 }
 
-function initObjectives() {
+async function initObjectives() {
   renderGoals();
   renderDaily();
-  loadNotionConfig();
+  await loadNotionConfig();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

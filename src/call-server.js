@@ -634,6 +634,7 @@ module.exports = {
   start,
   stop,
   ensureSTT,
+  transcribe,
   startTunnel,
   stopTunnel,
   updateTwilioWebhook,

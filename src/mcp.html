@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A - MCP Servers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { margin: 0; padding: 0; background: var(--bg-primary); color: var(--accent-cyan); font-family: var(--font-mono); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    #mcp-main { flex: 1; display: flex; gap: 24px; padding: 24px; overflow: hidden; }
+    .px-panel { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .px-left { width: 400px; flex-shrink: 0; overflow-y: auto; }
+    .px-right { flex: 1; overflow-y: auto; }
+    .panel-title { font-family: var(--font-hud); font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.35); }
+    .px-status-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: 1px; color: rgba(255,255,255,0.6); }
+    .px-status-row .px-val { color: var(--accent-cyan); font-family: var(--font-mono); word-break: break-all; text-align: right; }
+    .hl-status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .hl-on { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+    .hl-off { background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+    .hl-stby { background: var(--accent-gold); box-shadow: 0 0 8px var(--accent-gold); }
+    .hl-connecting { background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan); animation: blink 1s infinite; }
+    .px-field { display: flex; flex-direction: column; gap: 4px; }
+    .px-field label { font-family: var(--font-hud); font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.4); }
+    .px-field input, .px-field select, .px-field textarea { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--accent-cyan); font-family: var(--font-mono); font-size: 12px; padding: 8px 10px; border-radius: 4px; outline: none; resize: vertical; }
+    .px-field input:focus, .px-field select:focus, .px-field textarea:focus { border-color: var(--accent-cyan); box-shadow: 0 0 8px rgba(0,243,255,0.15); }
+    .px-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+    .px-btns button { flex: 1; min-width: 120px; }
+    .px-check { display: flex; align-items: center; gap: 8px; font-family: var(--font-hud); font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.5); cursor: pointer; }
+    .px-check input { accent-color: #00ff88; }
+    .px-hint { font-size: 9px; color: rgba(255,255,255,0.25); letter-spacing: 1px; line-height: 1.7; }
+    .px-log { flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 12px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px; line-height: 1.7; min-height: 100px; max-height: 180px; }
+    .px-log .ln-sys { color: rgba(255,255,255,0.35); }
+    .px-log .ln-ok { color: #00ff88; }
+    .px-log .ln-warn { color: var(--accent-gold); }
+    .px-log .ln-error { color: var(--accent-red); }
+    .px-srv { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .px-srv.on { border-color: rgba(0,255,136,0.5); box-shadow: 0 0 10px rgba(0,255,136,0.12); }
+    .px-srv.err { border-color: rgba(255,80,100,0.5); }
+    .px-shead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .px-sname { font-family: var(--font-hud); color: #fff; font-size: 11px; letter-spacing: 1px; }
+    .px-strans { font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 1px; }
+    .px-smeta { font-size: 9px; color: rgba(255,255,255,0.3); word-break: break-all; }
+    .px-scontrols { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .px-mini-btn { background: rgba(0,243,255,0.08); border: 1px solid rgba(0,243,255,0.3); color: var(--accent-cyan); font-family: var(--font-hud); font-size: 9px; letter-spacing: 1px; padding: 4px 8px; border-radius: 3px; cursor: pointer; }
+    .px-mini-btn:hover { background: rgba(0,243,255,0.2); }
+    .px-mini-btn.danger { border-color: rgba(255,80,100,0.4); color: var(--accent-red); background: rgba(255,80,100,0.08); }
+    .px-mini-btn.green { border-color: rgba(0,255,136,0.4); color: #00ff88; background: rgba(0,255,136,0.08); }
+    .px-tool { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .px-thead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .px-tname { font-family: var(--font-hud); color: var(--accent-cyan); font-size: 11px; letter-spacing: 1px; }
+    .px-tserver { font-size: 9px; color: rgba(255,255,255,0.35); letter-spacing: 1px; }
+    .px-tdesc { font-size: 10px; color: rgba(255,255,255,0.45); line-height: 1.5; word-break: break-word; }
+    .px-run { display: flex; gap: 8px; align-items: flex-end; }
+    .px-run textarea { flex: 1; min-height: 44px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--accent-cyan); font-family: var(--font-mono); font-size: 11px; padding: 8px 10px; border-radius: 4px; outline: none; }
+    .px-out { font-size: 10px; color: #00ff88; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.35); border: 1px solid rgba(0,255,136,0.15); border-radius: 4px; padding: 8px 10px; max-height: 180px; overflow-y: auto; }
+    .px-out.err { color: var(--accent-red); border-color: rgba(255,80,100,0.3); }
+    .px-count { color: #00ff88; font-size: 11px; }
+  </style>
+</head>
+<body>
+
+  <header id="hud-header">
+    <div class="header-left">
+      <span class="system-status-indicator blink"></span>
+      <span class="system-title">S.A.V.I.A</span>
+      <span class="system-version">v4.0.0</span>
+    </div>
+    <div class="header-center">MCP_SERVERS // MODEL_CONTEXT_PROTOCOL // ANY_APP</div>
+    <div class="header-right">
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <div id="clock-display">00:00:00</div>
+      <div class="window-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
+        <button class="win-btn" id="btn-close" title="Close">&#10005;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="mcp-main">
+
+    <div class="px-panel px-left">
+      <div class="panel-title">◆ AGGIUNGI / MODIFICA SERVER</div>
+      <div class="px-field">
+        <label>NOME</label>
+        <input type="text" id="inpName" placeholder="es. Filesystem Server" />
+      </div>
+      <div class="px-field">
+        <label>TRASPORTO</label>
+        <select id="selTransport">
+          <option value="stdio">STDIO (comando locale)</option>
+          <option value="http">HTTP (streamable HTTP)</option>
+          <option value="sse">SSE (eventStream)</option>
+        </select>
+      </div>
+
+      <div id="fldStdio">
+        <div class="px-field">
+          <label>COMANDO</label>
+          <input type="text" id="inpCommand" placeholder="es. npx / python script.py / node server.js" />
+        </div>
+        <div class="px-field">
+          <label>ARGOMENTI (separati da spazio)</label>
+          <input type="text" id="inpArgs" placeholder="es. -y @modelcontextprotocol/server-filesystem" />
+        </div>
+        <div class="px-field">
+          <label>DIRECTORY DI LAVORO (OPZIONALE)</label>
+          <input type="text" id="inpCwd" placeholder="es. C:\progetti\mio-server" />
+        </div>
+        <div class="px-field">
+          <label>ENV JSON (OPZIONALE)</label>
+          <textarea id="inpEnv" rows="2" placeholder='{ "API_KEY": "xxx" }'></textarea>
+        </div>
+      </div>
+
+      <div id="fldNet" style="display:none;">
+        <div class="px-field">
+          <label>URL ENDPOINT</label>
+          <input type="text" id="inpUrl" placeholder="https://host:port/mcp" />
+        </div>
+        <div class="px-field">
+          <label>HEADER JSON (OPZIONALI)</label>
+          <textarea id="inpHeaders" rows="2" placeholder='{ "Authorization": "Bearer xxx" }'></textarea>
+        </div>
+      </div>
+
+      <label class="px-check"><input type="checkbox" id="chkAuto" checked> CONNETTI ALL'AVVIO DI S.A.V.I.A</label>
+
+      <div class="px-btns">
+        <button class="hud-action-btn" id="btnSave"><i class="fas fa-save"></i> SALVA SERVER</button>
+        <button class="hud-action-btn" id="btnCancelEdit" style="display:none;"><i class="fas fa-times"></i> ANNULLA</button>
+      </div>
+      <div class="px-btns">
+        <button class="hud-action-btn green" id="btnPresetNotion" title="Precompila il form con il server ufficiale Notion (@notionhq/notion-mcp-server)"><i class="fab fa-notion"></i> PRESET: NOTION OFFICIALE</button>
+      </div>
+      <p class="px-hint" id="editingHint" style="display:none;">▼ STAI MODIFICANDO UN SERVER ESISTENTE</p>
+
+      <div class="panel-title" style="margin-top:6px;">◆ SERVER CONFIGURATI <span class="px-count" id="srvCount"></span></div>
+      <div id="srvList" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+      <div class="panel-title">◆ LOG MCP</div>
+      <div class="px-log" id="mcpLog"><div class="ln-sys">// mcp log pronto</div></div>
+    </div>
+
+    <div class="px-panel px-right">
+      <div class="panel-title">◆ TOOL DISCOVERED @ S.A.V.I.A <span class="px-count" id="toolCount"></span></div>
+      <p class="px-hint" style="margin:0;">
+        I tool MCP connessi diventano disponibili per l'agente cognitivo nel formato
+        <span style="color:var(--accent-cyan);">[TOOL] mcp:serverId toolName {json}</span>.
+        Puoi chiamarli qui per testarli manualmente.
+      </p>
+      <div id="toolList" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+        <div class="ln-sys">Nessun server connesso. Aggiungi e connetti un server MCP per scoprire i suoi tool.</div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="mcp.js"></script>
+  <script src="page-voice.js"></script>
+  <script src="nav-windows.js"></script>
+</body>
+</html>

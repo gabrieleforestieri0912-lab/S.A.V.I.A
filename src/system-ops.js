@@ -7,76 +7,14 @@ const systemAPI = window.electronAPI;
 
 // ── Scenarios ────────────────────────────────────────────────────────
 
-const SCENARIOS = {
-  'python-dev': {
-    name: 'Ambiente Sviluppo Python',
-    keywords: ['python', 'py dev', 'sviluppo python', 'python dev'],
-    actions: [
-      { type: 'log', text: 'Preparazione ambiente Python...' },
-      { type: 'open', target: 'code' },
-      { type: 'open', target: 'terminal' },
-      { type: 'open', target: 'browser', args: 'https://docs.python.org/3/' }
-    ]
-  },
-  'web-dev': {
-    name: 'Ambiente Sviluppo Web',
-    keywords: ['web', 'sviluppo web', 'frontend', 'html css'],
-    actions: [
-      { type: 'log', text: 'Configurazione ambiente Web...' },
-      { type: 'open', target: 'code' },
-      { type: 'open', target: 'terminal' },
-      { type: 'open', target: 'browser', args: 'https://developer.mozilla.org/' }
-    ]
-  },
-  'node-dev': {
-    name: 'Ambiente Sviluppo Node.js',
-    keywords: ['node', 'nodejs', 'javascript dev', 'npm'],
-    actions: [
-      { type: 'log', text: 'Avvio ambiente Node.js...' },
-      { type: 'open', target: 'code' },
-      { type: 'open', target: 'terminal' },
-      { type: 'open', target: 'browser', args: 'https://nodejs.org/docs/latest/api/' }
-    ]
-  },
-  'work': {
-    name: 'Ambiente Lavoro',
-    keywords: ['lavoro', 'ufficio', 'work mode', 'productivity'],
-    actions: [
-      { type: 'log', text: 'Allestimento ambiente lavoro...' },
-      { type: 'open', target: 'code' },
-      { type: 'open', target: 'browser' },
-      { type: 'open', target: 'terminal' }
-    ]
-  },
-  'gaming': {
-    name: 'Modalità Gaming',
-    keywords: ['gioco', 'gaming', 'giocare', 'game'],
-    actions: [
-      { type: 'log', text: 'Passaggio a modalità gaming...' },
-      { type: 'close', target: 'code' },
-      { type: 'close', target: 'browser' }
-    ]
-  },
-  'cleanup': {
-    name: 'Pulizia Desktop',
-    keywords: ['pulisci', 'cleanup', 'pulizia', 'riordina'],
-    actions: [
-      { type: 'log', text: 'Pulizia desktop in corso...' },
-      { type: 'close', target: 'notepad' },
-      { type: 'close', target: 'calculator' }
-    ]
-  }
-};
-
-function findScenario(text) {
-  const lower = text.toLowerCase();
-  for (const [key, scenario] of Object.entries(SCENARIOS)) {
-    if (scenario.keywords.some(k => lower.includes(k))) {
-      return key;
-    }
-  }
-  return null;
-}
+const SCENARIOS = [
+  'Ambiente Sviluppo Python',
+  'Ambiente Sviluppo Web',
+  'Ambiente Sviluppo Node.js',
+  'Ambiente Lavoro',
+  'Modalità Gaming',
+  'Pulizia Desktop'
+];
 
 // ── Action Executor ──────────────────────────────────────────────────
 
@@ -186,30 +124,49 @@ async function executeAction(action) {
         }
       } catch (e) { /* ignore */ }
       break;
+
+    case 'whatsapp':
+      try {
+        const waNumber = (action.phone || '').replace(/[^0-9+]/g, '');
+        const waText = encodeURIComponent(action.message || '');
+        const waUrl = waNumber
+          ? `whatsapp://send?phone=${waNumber}&text=${waText}`
+          : `whatsapp://send?text=${waText}`;
+        if (systemAPI && systemAPI.systemOpenUrl) {
+          await systemAPI.systemOpenUrl(waUrl);
+        } else {
+          window.open(waUrl, '_blank');
+        }
+        addTickerEvent('sys', `[SYS] WhatsApp: messaggio preparato${waNumber ? ` per ${waNumber}` : ''}`);
+        if (typeof sendNotification === 'function') {
+          sendNotification(`WhatsApp: messaggio preparato`, 'success', 3000);
+        }
+      } catch (e) {
+        addTickerEvent('warn', `[SYS] WhatsApp errore: ${e.message}`);
+      }
+      break;
+
+    case 'sms':
+      try {
+        const smsNumber = (action.phone || '').replace(/[^0-9+]/g, '');
+        const smsText = encodeURIComponent(action.message || '');
+        const smsUrl = smsNumber
+          ? `sms:${smsNumber}?body=${smsText}`
+          : `sms:?body=${smsText}`;
+        if (systemAPI && systemAPI.systemOpenUrl) {
+          await systemAPI.systemOpenUrl(smsUrl);
+        } else {
+          window.open(smsUrl, '_blank');
+        }
+        addTickerEvent('sys', `[SYS] SMS: messaggio preparato${smsNumber ? ` per ${smsNumber}` : ''}`);
+        if (typeof sendNotification === 'function') {
+          sendNotification(`SMS: messaggio preparato`, 'success', 3000);
+        }
+      } catch (e) {
+        addTickerEvent('warn', `[SYS] SMS errore: ${e.message}`);
+      }
+      break;
   }
-}
-
-// ── Run Scenario ─────────────────────────────────────────────────────
-
-async function runScenario(scenarioKey) {
-  const scenario = SCENARIOS[scenarioKey];
-  if (!scenario) return false;
-
-  addTickerEvent('sys', `[SYS] Esecuzione scenario: ${scenario.name}`);
-  appendLogMessage('sys', `▶ Esecuzione scenario: ${scenario.name}`, 'system');
-  appendLogMessage('sys', `⠙ Inizializzazione...`, 'system');
-
-  for (let i = 0; i < scenario.actions.length; i++) {
-    await executeAction(scenario.actions[i]);
-    // Small delay between actions for visual feedback
-    if (i < scenario.actions.length - 1) {
-      await new Promise(r => setTimeout(r, 800));
-    }
-  }
-
-  appendLogMessage('sys', `✓ Scenario "${scenario.name}" completato.`, 'system');
-  addTickerEvent('sys', `Scenario completato: ${scenario.name}`);
-  return true;
 }
 
 // ── Parse AI Response for Commands ───────────────────────────────────
@@ -294,6 +251,37 @@ async function processSystemCommands(text) {
         executed = true;
         break;
 
+      case 'whatsapp':
+        const waParts = (cmd.args || '').match(/^(\+?[\d\s\-().]+)\s*[-:]\s*(.+)$/s);
+        if (waParts) {
+          await executeAction({ type: 'whatsapp', phone: waParts[1].trim(), message: waParts[2].trim() });
+        } else {
+          await executeAction({ type: 'whatsapp', message: cmd.args || '' });
+        }
+        executed = true;
+        break;
+
+      case 'sms':
+        const smsParts = (cmd.args || '').match(/^(\+?[\d\s\-().]+)\s*[-:]\s*(.+)$/s);
+        if (smsParts) {
+          await executeAction({ type: 'sms', phone: smsParts[1].trim(), message: smsParts[2].trim() });
+        } else {
+          await executeAction({ type: 'sms', message: cmd.args || '' });
+        }
+        executed = true;
+        break;
+
+      case 'quit':
+      case 'shutdown':
+      case 'exit':
+      case 'esci':
+      case 'spegni':
+        if (systemAPI && systemAPI.quitApp) {
+          systemAPI.quitApp();
+          executed = true;
+        }
+        break;
+
       case 'move':
         const parts = cmd.args.split('→').map(s => s.trim());
         if (parts.length === 2 && systemAPI.systemMoveFile) {
@@ -308,97 +296,6 @@ async function processSystemCommands(text) {
   }
 
   return executed;
-}
-
-// ── Direct Command Interface (for voice/text shortcuts) ──────────────
-
-async function executeDirectCommand(text) {
-  const lower = text.toLowerCase();
-
-  // Check scenarios first
-  const scenarioKey = findScenario(text);
-  if (scenarioKey) {
-    await runScenario(scenarioKey);
-    return true;
-  }
-
-  // Single commands
-  if (lower.includes('volume')) {
-    if (lower.includes('mute') || lower.includes('silenzio')) {
-      await executeAction({ type: 'volume', subAction: 'mute' });
-    } else if (lower.includes('su') || lower.includes('aumenta') || lower.includes('più alto')) {
-      await executeAction({ type: 'volume', subAction: 'up' });
-    } else if (lower.includes('giù') || lower.includes('diminuisci') || lower.includes('più basso')) {
-      await executeAction({ type: 'volume', subAction: 'down' });
-    }
-    return true;
-  }
-
-  if (lower.includes('luminosità') || lower.includes('brightness')) {
-    const match = lower.match(/(\d+)/);
-    if (match) {
-      await executeAction({ type: 'brightness', value: parseInt(match[1]) });
-    }
-    return true;
-  }
-
-  // Media control (voice/text: "metti play", "pausa", "prossima canzone")
-  // Use word-boundary match for 'play' to avoid false positives (e.g. "player")
-  const mediaPlay = /(^|\s)(play|riproduci|metti play)(\s|$)/.test(lower) || lower.includes('pausa') || lower.includes('pause');
-  if (mediaPlay) {
-    await executeAction({ type: 'media', subAction: 'playpause' });
-    return true;
-  }
-  if (lower.includes('prossima canzone') || lower.includes('prossima traccia')) {
-    await executeAction({ type: 'media', subAction: 'next' });
-    return true;
-  }
-  if (lower.includes('canzone precedente') || lower.includes('traccia precedente')) {
-    await executeAction({ type: 'media', subAction: 'prev' });
-    return true;
-  }
-
-  if (lower.includes('screenshot') || lower.includes('cattura schermo')) {
-    await executeAction({ type: 'screenshot' });
-    return true;
-  }
-
-  const isAnalysis = lower.includes('analizza') || lower.includes('esamina') || lower.includes('leggi') || lower.includes('mostra contenuto');
-  if ((lower.includes('apri') || lower.includes('avvia') || lower.includes('lancia')) && !isAnalysis) {
-    const targets = ['vscode', 'code', 'chrome', 'firefox', 'edge', 'browser', 'terminal', 'cmd', 'notepad', 'explorer', 'spotify', 'slack', 'discord', 'telegram', 'calculator'];
-    for (const t of targets) {
-      if (lower.includes(t)) {
-        await executeAction({ type: 'open', target: t });
-        return true;
-      }
-    }
-    // Generic open - try to extract app name
-    const words = text.replace(/apri|avvia|lancia/gi, '').trim();
-    if (words && !isAnalysis) {
-      await executeAction({ type: 'open', target: words });
-      return true;
-    }
-  }
-
-  if (lower.includes('chiudi') || lower.includes('termina') || lower.includes('kill')) {
-    const targets = ['vscode', 'code', 'chrome', 'firefox', 'edge', 'browser', 'terminal', 'notepad', 'calculator', 'spotify', 'slack', 'discord'];
-    for (const t of targets) {
-      if (lower.includes(t)) {
-        await executeAction({ type: 'close', target: t });
-        return true;
-      }
-    }
-  }
-
-  if (lower.includes('cerca') || lower.includes('trova') || lower.includes('search')) {
-    const query = lower.replace(/cerca|trova|search/gi, '').trim();
-    if (query) {
-      await executeAction({ type: 'search', query });
-      return true;
-    }
-  }
-
-  return false;
 }
 
 // ── Hook into AI Response System ─────────────────────────────────────
@@ -416,7 +313,7 @@ document.addEventListener('savia-response-complete', async (e) => {
 // ── Build Context for AI ─────────────────────────────────────────────
 
 function buildSystemContext() {
-  const scenarioNames = Object.values(SCENARIOS).map(s => s.name).join(', ');
+  const scenarioNames = SCENARIOS.join(', ');
   return `
 SISTEMA: Hai il controllo completo del computer. Usa [CMD] SOLO se l'utente chiede ESPLICITAMENTE di aprire/chiudere qualcosa.
 NON aprire MAI applicazioni se l'utente chiede solo di analizzare, leggere o esaminare file/cartelle/progetti.
@@ -431,6 +328,9 @@ Comandi disponibili:
 [CMD] move:sorgente → destinazione - Sposta file
 [CMD] media:play/pausa/next/prev/stop - Controllo riproduzione multimediale
 [CMD] screenshot - Cattura lo schermo e salva in Pictures/SAVIA
+[CMD] whatsapp:numero - messaggio - Invia un messaggio WhatsApp (formato: numero - testo)
+[CMD] sms:numero - messaggio - Invia un SMS (formato: numero - testo)
+[CMD] quit - Spegni completamente S.A.V.I.A (SOLO su richiesta esplicita dell'utente)
 
 Scenario predefiniti: ${scenarioNames}
 Quando l'utente chiede esplicitamente di preparare un ambiente di lavoro, usa lo scenario appropriato con [CMD] e descrivi cosa hai fatto.

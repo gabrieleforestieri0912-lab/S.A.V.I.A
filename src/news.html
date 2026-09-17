@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S.A.V.I.A. - News Feed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .news-banner { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .news-banner-icon { width: 46px; height: 46px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--accent-gold); background: var(--accent-gold); background: rgba(255,183,3,0.12); border: 1px solid rgba(255,183,3,0.4); box-shadow: 0 0 18px var(--accent-gold-glow); }
+    .news-banner-title { font-family: var(--font-hud); font-size: 15px; letter-spacing: 1.5px; color: #fff; text-shadow: 0 0 10px var(--accent-gold-glow); }
+    .news-banner-sub { font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+
+    .news-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .news-tabbar { display: flex; gap: 2px; }
+    .nws-tab { background: transparent; border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); font-family: var(--font-hud); font-size: 9px; letter-spacing: 1px; padding: 8px 14px; cursor: pointer; border-radius: 4px; transition: all 0.15s; }
+    .nws-tab:hover { color: #fff; background: var(--accent-cyan-dim); }
+    .nws-tab.active { color: var(--accent-cyan); border-color: var(--accent-cyan); box-shadow: 0 0 10px var(--accent-cyan-dim); text-shadow: 0 0 8px var(--accent-cyan-glow); }
+    .news-toolbar .hud-input { flex: 1; min-width: 160px; }
+    #news-sources { display: flex; gap: 6px; flex-wrap: wrap; }
+    .nws-src-chip { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 5px 9px; border-radius: 4px; cursor: pointer; user-select: none; transition: all 0.15s; }
+    .nws-src-chip:hover { border-color: var(--accent-cyan); color: #fff; }
+    .nws-src-chip input { accent-color: var(--accent-cyan); }
+
+    .news-monitor { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 8px 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,183,3,0.15); border-radius: 4px; margin-bottom: 10px; }
+    .nws-status { font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 1px; }
+    .nws-status.on { color: var(--accent-gold); text-shadow: 0 0 8px var(--accent-gold-glow); }
+    .news-monitor label { font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .news-monitor label input { accent-color: var(--accent-gold); }
+    .news-monitor .hud-select { width: auto; padding: 5px 8px; font-size: 10px; }
+
+    .nws-layout { display: flex; gap: 10px; flex: 1; min-height: 0; }
+    .nws-feed-pane { flex: 2; min-width: 0; display: flex; flex-direction: column; }
+    .nws-side-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+    #news-feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+
+    .nws-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; transition: all 0.15s; }
+    .nws-card:hover { background: rgba(0,243,255,0.05); border-color: rgba(0,243,255,0.25); box-shadow: 0 0 12px var(--accent-cyan-dim); }
+    .nws-badges { display: flex; gap: 6px; align-items: center; }
+    .nws-src { font-family: var(--font-mono); font-size: 9px; color: var(--accent-cyan); border: 1px solid rgba(0,243,255,0.3); padding: 1px 6px; border-radius: 3px; }
+    .nws-cat { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: 3px; }
+    .nws-cat.ai { color: var(--accent-purple); border: 1px solid rgba(157,78,221,0.4); background: var(--accent-purple-dim); }
+    .nws-cat.tech { color: var(--accent-gold); border: 1px solid rgba(255,183,3,0.4); background: rgba(255,183,3,0.1); }
+    .nws-new { font-family: var(--font-hud); font-size: 9px; color: #0a0f1a; background: var(--accent-red); padding: 2px 6px; border-radius: 3px; box-shadow: 0 0 10px var(--accent-red-glow); animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .nws-title { font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; line-height: 1.35; }
+    .nws-title:hover { color: var(--accent-cyan); text-shadow: 0 0 8px var(--accent-cyan-glow); }
+    .nws-snippet { font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; }
+    .nws-meta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .nws-meta-item { font-family: var(--font-mono); font-size: 9px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 4px; }
+    .nws-meta-item i { color: var(--accent-cyan); font-size: 9px; }
+    .nws-actions { display: flex; gap: 6px; margin-top: 2px; }
+    .nws-actions .hud-action-btn { padding: 6px 10px; font-size: 9px; }
+    .nws-actions .nws-saved-on { color: var(--accent-gold); border-color: rgba(255,183,3,0.5); }
+
+    .nws-monitor-box, .nws-log-box { display: flex; flex-direction: column; }
+    .nws-box-head { font-family: var(--font-hud); font-size: 10px; letter-spacing: 1px; color: var(--accent-gold); padding: 8px 10px; border-bottom: 1px solid rgba(255,183,3,0.15); display: flex; justify-content: space-between; align-items: center; }
+    .nws-box-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
+    .nws-log-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; margin-bottom: 4px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; }
+    .nws-log-item a { flex: 1; min-width: 0; font-size: 11px; color: #fff; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nws-log-item a:hover { color: var(--accent-cyan); }
+    .nws-log-cat { font-family: var(--font-mono); font-size: 8px; padding: 1px 5px; border-radius: 3px; }
+    .nws-log-cat.ai { color: var(--accent-purple); border: 1px solid rgba(157,78,221,0.4); }
+    .nws-log-cat.tech { color: var(--accent-gold); border: 1px solid rgba(255,183,3,0.4); }
+    .nws-log-time { font-family: var(--font-mono); font-size: 9px; color: rgba(255,255,255,0.35); }
+    .nws-log-clear { padding: 8px 6px 4px; }
+    .nws-log-clear .hud-action-btn { padding: 6px 8px; font-size: 9px; }
+  </style>
+</head>
+<body>
+
+  <header id="hud-header">
+    <div class="header-left">
+      <span class="system-status-indicator blink"></span>
+      <span class="system-title">S.A.V.I.A</span>
+      <span class="system-version">v4.0.0</span>
+    </div>
+
+    <div class="header-center">
+      <span class="breadcrumb">SYSTEM_ROOT // NEWS_FEED // TECH_AI_MONITOR</span>
+    </div>
+
+    <div class="header-right">
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <div id="clock-display">00:00:00</div>
+      <div class="window-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
+        <button class="win-btn" id="btn-close" title="Close">&#10005;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app-workspace">
+
+    <aside id="left-sidebar">
+      <div class="nav-rail-header">
+        <div class="nav-rail-logo"><i class="fas fa-brain"></i></div>
+        <span class="nav-rail-title">S.A.V.I.A NAV</span>
+      </div>
+      <div class="nav-rail-items">
+        <div class="nav-rail-section-label">CORE</div>
+        <div class="nav-rail-item" onclick="window.location.href='index.html'">
+          <div class="nav-icon"><i class="fas fa-terminal"></i></div>
+          <div class="nav-label"><span class="nav-label-main">COGNITIVE_TERMINAL</span><span class="nav-label-sub">AI Chat HUD</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='terminal.html'">
+          <div class="nav-icon"><i class="fas fa-folder-open"></i></div>
+          <div class="nav-label"><span class="nav-label-main">COMMAND_CENTER</span><span class="nav-label-sub">File Explorer &amp; Terminal</span></div>
+        </div>
+        <div class="nav-rail-divider"></div>
+        <div class="nav-rail-section-label">MODULES</div>
+        <div class="nav-rail-item" onclick="window.location.href='calendar.html'">
+          <div class="nav-icon"><i class="fas fa-calendar-alt"></i></div>
+          <div class="nav-label"><span class="nav-label-main">CALENDAR</span><span class="nav-label-sub">Events &amp; Schedule</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='objectives.html'">
+          <div class="nav-icon"><i class="fas fa-bullseye"></i></div>
+          <div class="nav-label"><span class="nav-label-main">OBJECTIVES_HUB</span><span class="nav-label-sub">Goals &amp; Daily Log</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='imagine.html'">
+          <div class="nav-icon"><i class="fas fa-palette"></i></div>
+          <div class="nav-label"><span class="nav-label-main">AI_IMAGINE</span><span class="nav-label-sub">Text to Image</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='particles.html'">
+          <div class="nav-icon"><i class="fas fa-atom"></i></div>
+          <div class="nav-label"><span class="nav-label-main">NEURAL_PARTICLES</span><span class="nav-label-sub">3D Gesture Creator</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='globe.html'">
+          <div class="nav-icon"><i class="fas fa-globe"></i></div>
+          <div class="nav-label"><span class="nav-label-main">GLOBAL_TIMELINE</span><span class="nav-label-sub">World Time &amp; Weather</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='knowledge.html'">
+          <div class="nav-icon"><i class="fas fa-database"></i></div>
+          <div class="nav-label"><span class="nav-label-main">KNOWLEDGE_BASE</span><span class="nav-label-sub">RAG Document Store</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='mcp.html'">
+          <div class="nav-icon"><i class="fas fa-plug"></i></div>
+          <div class="nav-label"><span class="nav-label-main">MCP_SERVERS</span><span class="nav-label-sub">Connect Any App</span></div>
+        </div>
+        <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
+          <div class="nav-icon"><i class="fab fa-youtube"></i></div>
+          <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
+        </div>
+        <div class="nav-rail-item active">
+          <div class="nav-icon"><i class="fas fa-newspaper"></i></div>
+          <div class="nav-label"><span class="nav-label-main">NEWS_FEED</span><span class="nav-label-sub">Tech &amp; AI Monitor</span></div>
+        </div>
+      </div>
+      <div class="nav-rail-footer">
+        <div class="nav-rail-item" style="opacity:0.4;cursor:default;">
+          <div class="nav-icon"><i class="fas fa-shield-alt"></i></div>
+          <div class="nav-label"><span class="nav-label-main">SECURE SHELL</span><span class="nav-label-sub">127.0.0.1</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <section id="central-core-container">
+      <div class="view-panel flex-grow-column" id="news-app">
+
+        <div class="hud-panel-flat news-banner">
+          <div class="news-banner-icon"><i class="fas fa-newspaper"></i></div>
+          <div class="news-banner-text">
+            <div class="news-banner-title">NEWS_FEED — TECNOLOGIA &amp; AI</div>
+            <div class="news-banner-sub">Feed live da Hacker News, DEV Community e Google News IT. Il monitor in background avvisa quando escono nuove notizie.</div>
+          </div>
+          <div style="text-align:right;margin-left:auto;">
+            <div class="item-status online" id="news-status-dot"></div>
+            <div class="system-status-text" id="news-status-text" style="font-size:9px;">CONNESSO</div>
+          </div>
+        </div>
+
+        <div class="news-toolbar">
+          <div class="news-tabbar" id="news-tabs">
+            <button class="nws-tab active" data-cat="ALL">TUTTE</button>
+            <button class="nws-tab" data-cat="AI">AI</button>
+            <button class="nws-tab" data-cat="TECH">TECH</button>
+          </div>
+          <div id="news-sources">
+            <label class="nws-src-chip"><input type="checkbox" value="hn" checked /> HACKER NEWS</label>
+            <label class="nws-src-chip"><input type="checkbox" value="devto" checked /> DEV</label>
+            <label class="nws-src-chip"><input type="checkbox" value="gnews" checked /> GOOGLE NEWS IT</label>
+          </div>
+          <input type="text" id="news-search" class="hud-input" placeholder="Filtra notizie..." />
+          <button class="hud-action-btn-primary" id="news-refresh"><i class="fas fa-sync-alt"></i> AGGIORNA</button>
+        </div>
+
+        <div class="news-monitor">
+          <label><input type="checkbox" id="news-monitor-toggle" /> MONITOR SEGNALAZIONI</label>
+          <span class="nws-status" id="news-monitor-status">MONITOR ATTIVO</span>
+          <label>INTERVALLO <select id="news-interval" class="hud-select">
+            <option value="5">5 min</option>
+            <option value="10" selected>10 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
+          </select></label>
+          <label><input type="checkbox" id="news-speak" checked /> AVVISA VOCALMENTE</label>
+        </div>
+
+        <div class="nws-layout">
+          <div class="nws-feed-pane hud-panel">
+            <div class="panel-header">
+              <h2>ULTIME NOTIZIE</h2>
+              <span class="sub-header-telemetry" id="news-count">0 notizie</span>
+            </div>
+            <div class="panel-content scrollable" id="news-feed">
+              <div class="yt-loading"><i class="fas fa-spinner fa-pulse"></i> CARICAMENTO NOTIZIE...</div>
+            </div>
+          </div>
+
+          <div class="nws-side-pane">
+            <div class="hud-panel nws-log-box">
+              <div class="nws-box-head"><span>ULTIME SEGNALAZIONI</span><span class="sub-header-telemetry">S.A.V.I.A WATCHDOG</span></div>
+              <div class="nws-box-body" id="news-log"></div>
+            </div>
+            <div class="hud-panel nws-monitor-box">
+              <div class="nws-box-head"><span>COME FUNZIONA</span></div>
+              <div class="nws-box-body" style="padding:10px;font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,0.55);line-height:1.6;">
+                Il watchdog gira nella finestra principale e controlla le sorgenti ogni pochi minuti.<br><br>
+                Quando trova notizie nuove su <b style="color:var(--accent-gold);">Tech</b> o <b style="color:var(--accent-purple);">AI</b>, S.A.V.I.A ti avvisa con una notifica di sistema, un toast e la voce.<br><br>
+                Il canale vocale <b style="color:var(--accent-cyan);">"apri le notizie"</b> apre questa pagina.<br><br>
+                Le notizie già lette non vengono ripetute.
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <div id="hud-scanlines"></div>
+
+  <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
+  <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="auto"></audio>
+
+  <script src="shared.js"></script>
+  <script src="news.js"></script>
+  <script src="page-voice.js"></script>
+  <script src="nav-windows.js"></script>
+</body>
+</html>

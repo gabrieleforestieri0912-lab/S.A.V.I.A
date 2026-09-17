@@ -1,0 +1,25 @@
+{
+  "name": "savia-remote-control",
+  "version": "1.0.0",
+  "description": "S.A.V.I.A — Second Brain Remote Control (Fase 1): Telegram bot that parses natural-language commands via Claude.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^16.4.5",
+    "node-pty": "^1.1.0",
+    "node-telegram-bot-api": "0.67.0",
+    "simple-git": "^3.36.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/node-telegram-bot-api": "0.64.15",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}

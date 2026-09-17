@@ -3,28 +3,305 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>S.A.V.I.A. - Command Center</title>
+  <title>S.A.V.I.A. - Terminal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
   <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow: hidden; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+
+    .term-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: rgba(10, 12, 18, 0.95);
+      border-bottom: 1px solid rgba(0, 243, 255, 0.1);
+      flex-shrink: 0;
+      z-index: 100;
+    }
+
+    .term-toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .term-toolbar-sep {
+      width: 1px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 0 6px;
+    }
+
+    .ttb-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.5);
+      width: 28px; height: 26px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      transition: all 0.15s;
+    }
+    .ttb-btn:hover { background: rgba(0, 243, 255, 0.1); border-color: var(--accent-cyan); color: #fff; }
+    .ttb-btn.active { background: rgba(0, 243, 255, 0.15); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+    .ttb-btn.danger:hover { background: rgba(255, 60, 60, 0.15); border-color: var(--accent-red); color: var(--accent-red); }
+
+    .ttb-label {
+      font-family: var(--font-hud);
+      font-size: 9px;
+      letter-spacing: 1px;
+      color: rgba(255, 255, 255, 0.3);
+      margin-right: 6px;
+    }
+
+    /* ── Tab Bar ─────────────────────────────────────── */
+    .term-tab-bar {
+      display: flex;
+      align-items: stretch;
+      background: rgba(8, 10, 16, 0.98);
+      border-bottom: 1px solid rgba(0, 243, 255, 0.08);
+      overflow-x: auto;
+      flex-shrink: 0;
+      height: 32px;
+    }
+    .term-tab-bar::-webkit-scrollbar { height: 0; }
+
+    .term-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      border-right: 1px solid rgba(255, 255, 255, 0.04);
+      transition: all 0.15s;
+      white-space: nowrap;
+      position: relative;
+      min-width: 80px;
+    }
+    .term-tab:hover { background: rgba(255, 255, 255, 0.03); color: rgba(255, 255, 255, 0.6); }
+    .term-tab.active {
+      background: rgba(0, 243, 255, 0.06);
+      color: var(--accent-cyan);
+      border-bottom: 2px solid var(--accent-cyan);
+    }
+    .term-tab .tab-close {
+      opacity: 0;
+      width: 16px; height: 16px;
+      border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px;
+      transition: all 0.1s;
+    }
+    .term-tab:hover .tab-close { opacity: 0.5; }
+    .term-tab .tab-close:hover { opacity: 1; background: rgba(255, 60, 60, 0.3); color: var(--accent-red); }
+
+    .term-tab-add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.25);
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .term-tab-add:hover { color: var(--accent-cyan); background: rgba(0, 243, 255, 0.06); }
+
+    /* ── Split Container ─────────────────────────────── */
+    .split-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+    .split-container.horizontal { flex-direction: row; }
+    .split-container.vertical { flex-direction: column; }
+
+    .split-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 200px;
+      min-height: 100px;
+      position: relative;
+    }
+
+    .split-divider {
+      flex-shrink: 0;
+      background: rgba(0, 243, 255, 0.08);
+      transition: background 0.15s;
+      z-index: 10;
+    }
+    .split-container.horizontal .split-divider {
+      width: 4px;
+      cursor: col-resize;
+    }
+    .split-container.vertical .split-divider {
+      height: 4px;
+      cursor: row-resize;
+    }
+    .split-divider:hover { background: var(--accent-cyan); }
+
+    .pane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid rgba(0, 243, 255, 0.06);
+      flex-shrink: 0;
+      height: 28px;
+    }
+    .pane-header-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      letter-spacing: 0.5px;
+    }
+    .pane-header-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .pane-action-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.3);
+      width: 20px; height: 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+      transition: all 0.1s;
+    }
+    .pane-action-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+    .xterm-container {
+      flex: 1;
+      overflow: hidden;
+      padding: 4px;
+    }
+
+    /* ── Status Bar ──────────────────────────────────── */
+    .term-status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 12px;
+      background: rgba(10, 12, 18, 0.95);
+      border-top: 1px solid rgba(0, 243, 255, 0.08);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.3);
+      flex-shrink: 0;
+      height: 22px;
+    }
+    .term-status-bar .status-left { display: flex; gap: 12px; }
+    .term-status-bar .status-right { display: flex; gap: 12px; }
+    .status-item { display: flex; align-items: center; gap: 4px; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-dot.green { background: #00ff88; box-shadow: 0 0 4px #00ff88; }
+    .status-dot.yellow { background: #ffc800; box-shadow: 0 0 4px #ffc800; }
+    .status-dot.red { background: #ff3c3c; box-shadow: 0 0 4px #ff3c3c; }
+    .status-dot.cyan { background: var(--accent-cyan); box-shadow: 0 0 4px var(--accent-cyan); }
+
+    /* ── Command Palette Overlay ──────────────────────── */
+    .cmd-palette-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 80px;
+    }
+    .cmd-palette-overlay.visible { display: flex; }
+
+    .cmd-palette {
+      width: 500px;
+      max-height: 400px;
+      background: rgba(12, 14, 22, 0.98);
+      border: 1px solid rgba(0, 243, 255, 0.2);
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 243, 255, 0.05);
+      overflow: hidden;
+    }
+
+    .cmd-palette-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.1);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      padding: 14px 18px;
+      outline: none;
+    }
+    .cmd-palette-input::placeholder { color: rgba(255, 255, 255, 0.2); }
+
+    .cmd-palette-list {
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 6px;
+    }
+    .cmd-palette-list::-webkit-scrollbar { width: 4px; }
+    .cmd-palette-list::-webkit-scrollbar-thumb { background: rgba(0, 243, 255, 0.2); border-radius: 2px; }
+
+    .cmd-palette-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .cmd-palette-item:hover, .cmd-palette-item.selected {
+      background: rgba(0, 243, 255, 0.08);
+    }
+    .cmd-palette-item .cmd-icon {
+      width: 20px;
+      text-align: center;
+      color: var(--accent-cyan);
+      font-size: 12px;
+    }
+    .cmd-palette-item .cmd-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    .cmd-palette-item .cmd-shortcut {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.25);
+    }
+  </style>
 </head>
 <body>
 
-  <header id="hud-header">
+  <header id="hud-header" style="height:36px;min-height:36px;">
     <div class="header-left">
       <span class="system-status-indicator blink"></span>
       <span class="system-title">S.A.V.I.A</span>
       <span class="system-version">v4.0.0</span>
     </div>
-
     <div class="header-center">
-      <span class="breadcrumb">SYSTEM_ROOT // COMMAND_CENTER // FILE_OPS_TERMINAL</span>
+      <span class="breadcrumb">SYSTEM_ROOT // TERMINAL // MULTI_PANE</span>
     </div>
-
     <div class="header-right">
-      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> AI CHAT</button>
       <div class="window-controls">
         <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
         <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
@@ -33,301 +310,68 @@
     </div>
   </header>
 
-  <main id="app-workspace">
+  <div class="term-toolbar">
+    <span class="ttb-label">TERMINAL</span>
+    <div class="term-toolbar-group">
+      <button class="ttb-btn" id="btn-new-tab" title="New Tab (Ctrl+T)"><i class="fas fa-plus"></i></button>
+      <button class="ttb-btn danger" id="btn-close-tab" title="Close Tab (Ctrl+W)"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="term-toolbar-sep"></div>
+    <div class="term-toolbar-group">
+      <button class="ttb-btn" id="btn-split-h" title="Split Horizontal"><i class="fas fa-arrows-alt-h"></i></button>
+      <button class="ttb-btn" id="btn-split-v" title="Split Vertical"><i class="fas fa-arrows-alt-v"></i></button>
+    </div>
+    <div class="term-toolbar-sep"></div>
+    <div class="term-toolbar-group">
+      <button class="ttb-btn" id="btn-palette" title="Command Palette (Ctrl+Shift+P)"><i class="fas fa-terminal"></i></button>
+      <button class="ttb-btn" id="btn-voice-cmd" title="Voice Command"><i class="fas fa-microphone"></i></button>
+    </div>
+    <div style="flex:1"></div>
+    <div class="term-toolbar-group">
+      <button class="ttb-btn" id="btn-focus-left" title="Focus Left"><i class="fas fa-chevron-left"></i></button>
+      <button class="ttb-btn" id="btn-focus-right" title="Focus Right"><i class="fas fa-chevron-right"></i></button>
+      <button class="ttb-btn" id="btn-focus-up" title="Focus Up"><i class="fas fa-chevron-up"></i></button>
+      <button class="ttb-btn" id="btn-focus-down" title="Focus Down"><i class="fas fa-chevron-down"></i></button>
+    </div>
+  </div>
 
-    <aside id="left-sidebar">
-      <div class="nav-rail-header">
-        <div class="nav-rail-logo"><i class="fas fa-brain"></i></div>
-        <span class="nav-rail-title">S.A.V.I.A NAV</span>
-      </div>
-      <div class="nav-rail-items">
-        <div class="nav-rail-section-label">CORE</div>
-        <div class="nav-rail-item" onclick="window.location.href='index.html'">
-          <div class="nav-icon"><i class="fas fa-terminal"></i></div>
-          <div class="nav-label"><span class="nav-label-main">COGNITIVE_TERMINAL</span><span class="nav-label-sub">AI Chat HUD</span></div>
-        </div>
-        <div class="nav-rail-item active">
-          <div class="nav-icon"><i class="fas fa-folder-open"></i></div>
-          <div class="nav-label"><span class="nav-label-main">COMMAND_CENTER</span><span class="nav-label-sub">File Explorer &amp; Terminal</span></div>
-        </div>
-        <div class="nav-rail-divider"></div>
-        <div class="nav-rail-section-label">MODULES</div>
-        <div class="nav-rail-item" onclick="window.location.href='calendar.html'">
-          <div class="nav-icon"><i class="fas fa-calendar-alt"></i></div>
-          <div class="nav-label"><span class="nav-label-main">CALENDAR</span><span class="nav-label-sub">Events &amp; Schedule</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='objectives.html'">
-          <div class="nav-icon"><i class="fas fa-bullseye"></i></div>
-          <div class="nav-label"><span class="nav-label-main">OBJECTIVES_HUB</span><span class="nav-label-sub">Goals &amp; Daily Log</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='imagine.html'">
-          <div class="nav-icon"><i class="fas fa-palette"></i></div>
-          <div class="nav-label"><span class="nav-label-main">AI_IMAGINE</span><span class="nav-label-sub">Text to Image</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='particles.html'">
-          <div class="nav-icon"><i class="fas fa-atom"></i></div>
-          <div class="nav-label"><span class="nav-label-main">NEURAL_PARTICLES</span><span class="nav-label-sub">3D Gesture Creator</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='globe.html'">
-          <div class="nav-icon"><i class="fas fa-globe"></i></div>
-          <div class="nav-label"><span class="nav-label-main">GLOBAL_TIMELINE</span><span class="nav-label-sub">World Time &amp; Weather</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='knowledge.html'">
-          <div class="nav-icon"><i class="fas fa-database"></i></div>
-          <div class="nav-label"><span class="nav-label-main">KNOWLEDGE_BASE</span><span class="nav-label-sub">RAG Document Store</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
-          <div class="nav-icon"><i class="fab fa-youtube"></i></div>
-          <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
-        </div>
+  <div class="term-tab-bar" id="tab-bar">
+    <div class="term-tab-add" id="btn-add-tab" title="New Tab"><i class="fas fa-plus"></i></div>
+  </div>
 
-        <div class="nav-rail-divider"></div>
-        <div class="nav-rail-section-label">COMM</div>
+  <div class="split-container horizontal" id="split-root">
+    <!-- Panes injected by JS -->
+  </div>
 
-        <div class="nav-rail-item" onclick="window.location.href='hotline.html'">
-          <div class="nav-icon"><i class="fas fa-phone"></i></div>
-          <div class="nav-label"><span class="nav-label-main">CALL_HOTLINE</span><span class="nav-label-sub">Telefono → AI</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='proximity.html'">
-          <div class="nav-icon"><i class="fas fa-broadcast-tower"></i></div>
-          <div class="nav-label"><span class="nav-label-main">PROXIMITY_NEARBY</span><span class="nav-label-sub">BLE & Auto-Unlock</span></div>
-        </div>
-      </div>
-      <div class="nav-rail-footer">
-        <div class="nav-rail-item" style="opacity:0.4;cursor:default;">
-          <div class="nav-icon"><i class="fas fa-shield-alt"></i></div>
-          <div class="nav-label"><span class="nav-label-main">SECURE SHELL</span><span class="nav-label-sub">127.0.0.1</span></div>
-        </div>
-      </div>
-    </aside>
+  <div class="term-status-bar">
+    <div class="status-left">
+      <div class="status-item"><span class="status-dot green"></span> PTY ACTIVE</div>
+      <div class="status-item" id="status-tabs">TABS: 1</div>
+      <div class="status-item" id="status-panes">PANES: 1</div>
+    </div>
+    <div class="status-right">
+      <div class="status-item" id="status-focus">FOCUS: —</div>
+      <div class="status-item" id="status-cwd">CWD: —</div>
+    </div>
+  </div>
 
-    <section id="central-core-container">
-
-      <div class="view-panel flex-grow">
-        <div class="commander-split">
-          <div id="commander-filebrowser" class="hud-panel flex-grow-column">
-            <div class="panel-header">
-              <h2>FILE_EXPLORER</h2>
-              <span class="sub-header-telemetry" id="fb-status">0 items</span>
-            </div>
-            <div class="fb-toolbar">
-              <button class="fb-btn" id="fb-back" title="Back"><i class="fas fa-chevron-left"></i></button>
-              <button class="fb-btn" id="fb-forward" title="Forward"><i class="fas fa-chevron-right"></i></button>
-              <button class="fb-btn" id="fb-up" title="Up"><i class="fas fa-chevron-up"></i></button>
-              <button class="fb-btn" id="fb-refresh" title="Refresh"><i class="fas fa-sync-alt"></i></button>
-              <button class="fb-btn" id="fb-select-dir" title="Select Directory"><i class="fas fa-folder-open"></i></button>
-              <button class="fb-btn" id="fb-scan-btn" title="Smart File Scanner"><i class="fas fa-microchip"></i></button>
-              <div class="fb-path-bar">
-                <span class="fb-path-text" id="fb-path-text">COMPUTER</span>
-              </div>
-            </div>
-            <div class="panel-content scrollable" id="fb-content">
-              <div id="fb-list"></div>
-            </div>
-            <div class="panel-footer">
-              <span class="footer-telemetry" id="fb-footer-text">READY</span>
-            </div>
-          </div>
-
-          <div id="commander-terminal" class="hud-panel flex-grow-column">
-            <div class="panel-header">
-              <h2>TERMINAL</h2>
-              <div class="term-header-actions">
-                <span class="sub-header-telemetry" id="term-status">IDLE</span>
-                <button class="fb-btn" id="term-clear" title="Clear Output"><i class="fas fa-trash-alt"></i></button>
-                <button class="fb-btn" id="term-kill" title="Kill Running Command"><i class="fas fa-stop"></i></button>
-              </div>
-            </div>
-            <div class="panel-content" id="term-content">
-              <div id="term-output" class="scrollable"></div>
-            </div>
-            <div class="term-input-area">
-              <span class="term-cwd-label" id="term-cwd">C:\</span>
-              <form id="terminal-command-form">
-                <input type="text" id="term-input" autocomplete="off" placeholder="Enter command..." />
-                <button type="submit" id="term-submit">RUN</button>
-              </form>
-            </div>
-          </div>
-
-          <div id="commander-scanner" class="hud-panel flex-grow-column hidden">
-            <div class="panel-header">
-              <h2>FILE_SCANNER</h2>
-              <div class="term-header-actions">
-                <span class="sub-header-telemetry" id="scan-status">READY</span>
-                <button class="fb-btn" id="scan-describe-all" title="Describe All Files"><i class="fas fa-file-alt"></i></button>
-                <button class="fb-btn" id="scan-close" title="Close Scanner"><i class="fas fa-times"></i></button>
-              </div>
-            </div>
-            <div class="panel-content scrollable" id="scan-results">
-              <div class="scan-info">Navigate to a folder and click <i class="fas fa-microchip"></i> to scan. Then press <i class="fas fa-file-alt"></i> to describe each file with AI.</div>
-            </div>
-            <div class="panel-footer">
-              <span class="footer-telemetry" id="scan-footer-text">IDLE</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <aside id="right-sidebar" class="hud-panel">
-      <!-- Clock Panel at the top of the right sidebar -->
-      <div class="sidebar-subview" style="padding: 15px; border-bottom: 1px solid rgba(0, 243, 255, 0.1); text-align: center;">
-        <div class="panel-header" style="border: none; padding: 0 0 5px 0; justify-content: center;">
-          <h2 style="font-size: 11px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.4); text-transform: uppercase;">REALTIME_LIVE_CLOCK</h2>
-        </div>
-        <div id="clock-display">00:00:00</div>
-      </div>
-
-      <div id="sidebar-telemetry-container" class="sidebar-subview flex-grow-column">
-        <div class="panel-header">
-          <h2>TELEMETRY_DIAGS</h2>
-          <span class="sub-header-telemetry">REFRESH: LIVE</span>
-        </div>
-
-        <div class="panel-content scrollable">
-          <div class="telemetry-card">
-            <div class="card-header">
-              <span>NEURAL CORE LOAD</span>
-              <span id="txt-cpu-load">0%</span>
-            </div>
-            <div class="progress-gauge">
-              <div class="gauge-fill neon-cyan-glow" id="fill-cpu" style="width: 0%"></div>
-            </div>
-            <div class="micro-stats">AVG: 18.4% // PEAK: 46.2%</div>
-          </div>
-
-          <div class="telemetry-card">
-            <div class="card-header">
-              <span>MEMORY CONSUMPTION</span>
-              <span id="txt-mem-load">0 GB</span>
-            </div>
-            <div class="progress-gauge">
-              <div class="gauge-fill neon-purple-glow" id="fill-mem" style="width: 0%"></div>
-            </div>
-            <div class="micro-stats">TOTAL AVAILABLE: 16.00 GB</div>
-          </div>
-
-          <div class="ticker-box" id="system-logs-ticker">
-            <div class="ticker-title">REALTIME_EVENT_LOG <span class="click-hint">// CLICK TO OPEN</span></div>
-            <div class="ticker-content" id="ticker-events">
-              <div class="ticker-item">[SYS] Active memory registers initialized.</div>
-              <div class="ticker-item">[SYS] Listening on IPC render-frame channels.</div>
-            </div>
-          </div>
-
-          <div class="hud-control-group">
-            <h3>SYSTEM MODES</h3>
-            <button class="hud-action-btn active" id="btn-overclock">
-              <span class="indicator green"></span> OVERCLOCK STATE
-            </button>
-            <button class="hud-action-btn" id="btn-sound">
-              <span class="indicator green"></span> SONIC SOUND EFFECTS
-            </button>
-            <button class="hud-action-btn" id="btn-scanlines">
-              <span class="indicator green"></span> GRAPHICAL SCANLINES
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel-footer">
-        <span class="footer-telemetry">SYS_FREQ: 60FPS // BUFFERS: STABLE</span>
-      </div>
-    </aside>
-
-  </main>
+  <!-- Command Palette -->
+  <div class="cmd-palette-overlay" id="cmd-palette-overlay">
+    <div class="cmd-palette">
+      <input type="text" class="cmd-palette-input" id="cmd-palette-input" placeholder="Type a command or action..." autocomplete="off" />
+      <div class="cmd-palette-list" id="cmd-palette-list"></div>
+    </div>
+  </div>
 
   <div id="hud-scanlines"></div>
 
-  <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
-  <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="auto"></audio>
-
-  <div id="logs-modal" class="hidden-modal">
-    <div id="logs-modal-content" class="hud-panel-flat">
-      <header class="modal-header">
-        <div class="modal-title-left">
-          <span class="system-status-indicator blink"></span>
-          <span class="modal-title-text">SYSTEM_LOGS_CONSOLE</span>
-        </div>
-        <div class="modal-header-right">
-          <span id="modal-clock">00:00:00</span>
-          <button id="btn-close-modal" class="modal-close-btn"><i class="fas fa-times"></i></button>
-        </div>
-      </header>
-
-      <section class="modal-toolbar">
-        <div class="filter-group">
-          <button class="filter-btn active" data-filter="all">ALL_LOGS</button>
-          <button class="filter-btn" data-filter="sys">SYS</button>
-          <button class="filter-btn" data-filter="particles">PARTICLES</button>
-          <button class="filter-btn" data-filter="ollama">OLLAMA</button>
-          <button class="filter-btn" data-filter="warn">ALERTS</button>
-        </div>
-        <div class="modal-telemetry">
-          LOGS_COUNT: <span id="modal-logs-count">0</span>
-        </div>
-      </section>
-
-      <main id="modal-logs-body" class="scrollable">
-        <div id="modal-logs-list"></div>
-      </main>
-
-      <footer class="modal-footer-box">
-        <div class="footer-left">
-          <span>SECURE CORE LOGGER // 127.0.0.1</span>
-        </div>
-        <div class="footer-right">
-          <button id="btn-clear-modal-logs" class="hud-action-btn-danger">
-            <span class="indicator red"></span> CLEAR LOGS BUFFER
-          </button>
-          <button id="btn-close-modal-footer" class="hud-action-btn-primary">
-            DISMISS CONSOLE
-          </button>
-        </div>
-      </footer>
-    </div>
-  </div>
-
-  <div id="confirm-modal" class="hidden-modal">
-    <div id="confirm-modal-content" class="hud-panel-flat">
-      <div class="modal-header">
-        <div class="modal-title-left">
-          <span class="system-status-indicator blink"></span>
-          <span class="modal-title-text" id="confirm-title">CONFIRM_ACTION</span>
-        </div>
-      </div>
-      <div class="confirm-body">
-        <p id="confirm-message">Are you sure?</p>
-      </div>
-      <footer class="modal-footer-box">
-        <div class="footer-right">
-          <button id="confirm-cancel" class="hud-action-btn-primary">CANCEL</button>
-          <button id="confirm-ok" class="hud-action-btn-danger">CONFIRM</button>
-        </div>
-      </footer>
-    </div>
-  </div>
-
-  <div id="context-menu" class="hidden">
-    <div class="context-menu-item" id="ctx-rename">Rename</div>
-    <div class="context-menu-item" id="ctx-delete">Delete</div>
-    <div class="context-menu-item" id="ctx-copy-path">Copy Path</div>
-    <div class="context-menu-item" id="ctx-open-explorer">Open in Explorer</div>
-  </div>
-
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
   <script src="shared.js"></script>
-  <script src="commander.js"></script>
   <script src="telemetry.js"></script>
-
-<script>
-function openEditor() {
-  if (window.electronAPI?.openEditor) {
-    window.electronAPI.openEditor();
-  }
-}
-</script>
+  <script src="commander.js"></script>
+  <script src="page-voice.js"></script>
   <script src="nav-windows.js"></script>
 </body>
 </html>

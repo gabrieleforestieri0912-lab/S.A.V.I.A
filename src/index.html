@@ -128,11 +128,27 @@
           </div>
         </div>
 
+        <div class="nav-rail-item" onclick="window.location.href='mcp.html'">
+          <div class="nav-icon"><i class="fas fa-plug"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">MCP_SERVERS</span>
+            <span class="nav-label-sub">Connect Any App</span>
+          </div>
+        </div>
+
         <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
           <div class="nav-icon"><i class="fab fa-youtube"></i></div>
           <div class="nav-label">
             <span class="nav-label-main">YOUTUBE</span>
             <span class="nav-label-sub">Video Explorer</span>
+          </div>
+        </div>
+
+        <div class="nav-rail-item" onclick="window.location.href='news.html'">
+          <div class="nav-icon"><i class="fas fa-newspaper"></i></div>
+          <div class="nav-label">
+            <span class="nav-label-main">NEWS_FEED</span>
+            <span class="nav-label-sub">Tech & AI Monitor</span>
           </div>
         </div>
 
@@ -221,7 +237,7 @@
         <div id="chat-terminal-panel" class="hud-panel flex-grow">
           <div class="panel-header">
             <h2>TERMINALE_COGNITIVO</h2>
-            <span class="sub-header-telemetry" id="chat-model-info">INTELLIGENZA: OLLAMA // MISTRAL</span>
+            <span class="sub-header-telemetry" id="chat-model-info">INTELLIGENZA: OPENROUTER // NEMOTRON-3.5-LIGHTNING:FREE</span>
             <div id="voice-chat-indicator">
               <i class="fas fa-microphone vc-mic idle" id="chat-vc-mic"></i>
               <span class="vc-label" id="chat-vc-label">VOICE</span>
@@ -233,12 +249,12 @@
               <div class="log-message system">
                 <span class="log-timestamp">[18:34:53]</span>
                 <span class="log-sender">[SYS_INIT]:</span>
-                <span class="log-text">S.A.V.I.A. operative matrix initialized. Ready to connect local cognitive nodes.</span>
+                <span class="log-text">S.A.V.I.A. operative matrix initialized. Ready to connect cognitive nodes.</span>
               </div>
               <div class="log-message system">
                 <span class="log-timestamp">[18:34:54]</span>
-                <span class="log-sender">[OLLAMA_BRIDGE]:</span>
-                <span class="log-text" id="initialization-log">Checking local cognitive bridge on http://localhost:11434...</span>
+                <span class="log-sender">[COGNITIVE_BRIDGE]:</span>
+                <span class="log-text" id="initialization-log">Verifying cognitive bridge on OpenRouter...</span>
               </div>
             </div>
 
@@ -458,10 +474,7 @@
             <button class="hud-action-btn" id="btn-elevenlabs">
               <span class="indicator"></span> ELEVENLABS TTS
             </button>
-            <input type="password" id="elevenlabs-key-input" class="hud-input" placeholder="ElevenLabs API Key (opzionale)" style="font-size:9px;padding:6px 8px;" />
-            <button class="mem-scan-btn" id="btn-save-elevenlabs-key" style="margin-top:4px;">
-              <i class="fas fa-key"></i> SAVE KEY
-            </button>
+
           </div>
 
           <div class="hud-control-group">
@@ -515,6 +528,9 @@
             <button class="hud-action-btn" id="btn-auto-speak">
               <span class="indicator"></span> AUTO SPEAK
             </button>
+            <button class="hud-action-btn" id="btn-standby" title="Pausa / ripresa azione in corso — riprende esattamente da dove era rimasto">
+              <span class="indicator"></span> STAND BY (PAUSA)
+            </button>
             <button class="hud-action-btn" id="vc-wake-toggle">
               <span class="indicator"></span> WAKE WORD "HEY SAVIA"
             </button>
@@ -558,6 +574,7 @@
       </div>
     </div>
     <div class="boot-title">S.A.V.I.A</div>
+    <div class="boot-acron">SMART ARTIFICIAL VIRTUAL INTELLIGENCE ASSISTANT</div>
     <div class="boot-sub">COGNITIVE INTERFACE // POWER-ON SEQUENCE</div>
     <div id="boot-log" class="boot-log"></div>
     <div class="boot-progress-track">
@@ -621,10 +638,13 @@
   <script src="boot.js"></script>
   <script src="shared.js"></script>
   <script src="agents.js"></script>
+  <script src="actions-config.js"></script>
   <script src="ollama.js"></script>
+  <script src="news.js"></script>
   <script src="telemetry.js"></script>
   <script src="memory.js"></script>
   <script src="system-ops.js"></script>
+  <script src="stt-local.js"></script>
   <script src="voice-control.js"></script>
   <script src="dashboard.js"></script>
   <script src="knowledge-base.js"></script>

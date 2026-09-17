@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
@@ -25,7 +28,7 @@
     </div>
 
     <div class="header-center">
-      <span class="breadcrumb">SYSTEM_ROOT // NEURAL_PARTICLES // 3D_GESTURE_CREATOR</span>
+      <span class="breadcrumb">SYSTEM_ROOT // NEURAL_PARTICLES // 3D_SCENE_CREATOR</span>
     </div>
 
     <div class="header-right">
@@ -71,7 +74,7 @@
         </div>
         <div class="nav-rail-item active">
           <div class="nav-icon"><i class="fas fa-atom"></i></div>
-          <div class="nav-label"><span class="nav-label-main">NEURAL_PARTICLES</span><span class="nav-label-sub">3D Gesture Creator</span></div>
+          <div class="nav-label"><span class="nav-label-main">NEURAL_PARTICLES</span><span class="nav-label-sub">3D Scene Creator</span></div>
         </div>
         <div class="nav-rail-item" onclick="window.location.href='globe.html'">
           <div class="nav-icon"><i class="fas fa-globe"></i></div>
@@ -81,14 +84,20 @@
           <div class="nav-icon"><i class="fas fa-database"></i></div>
           <div class="nav-label"><span class="nav-label-main">KNOWLEDGE_BASE</span><span class="nav-label-sub">RAG Document Store</span></div>
         </div>
+        <div class="nav-rail-item" onclick="window.location.href='mcp.html'">
+          <div class="nav-icon"><i class="fas fa-plug"></i></div>
+          <div class="nav-label"><span class="nav-label-main">MCP_SERVERS</span><span class="nav-label-sub">Connect Any App</span></div>
+        </div>
         <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
           <div class="nav-icon"><i class="fab fa-youtube"></i></div>
           <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
         </div>
-
+        <div class="nav-rail-item" onclick="window.location.href='news.html'">
+          <div class="nav-icon"><i class="fas fa-newspaper"></i></div>
+          <div class="nav-label"><span class="nav-label-main">NEWS_FEED</span><span class="nav-label-sub">Tech &amp; AI Monitor</span></div>
+        </div>
         <div class="nav-rail-divider"></div>
         <div class="nav-rail-section-label">COMM</div>
-
         <div class="nav-rail-item" onclick="window.location.href='hotline.html'">
           <div class="nav-icon"><i class="fas fa-phone"></i></div>
           <div class="nav-label"><span class="nav-label-main">CALL_HOTLINE</span><span class="nav-label-sub">Telefono → AI</span></div>
@@ -115,12 +124,26 @@
 
             <div id="particles-loading-spinner" class="particles-loader-container">
               <span class="loader"></span>
-              <div class="loader-text">INITIALIZING NEURAL HAND ENGINE...</div>
+              <div class="loader-text">INITIALIZING 3D SCENE ENGINE...</div>
             </div>
 
             <div id="particles-status-hud" class="hidden">
               <div class="status-title" id="particles-gesture-status">NO HAND</div>
-              <div class="status-desc"><i class="fas fa-hand-pointer"></i> MOVE HAND TO ROTATE // <i class="fas fa-hand-peace"></i> PINCH TO SCALE // <i class="fas fa-hand-paper"></i> FLICK SPEED TO RESET</div>
+              <div class="status-desc">
+                <i class="fas fa-hand-pointer"></i> MOVE ROTATE //
+                <i class="fas fa-hand-peace"></i> PINCH SCALE //
+                <i class="fas fa-hand-paper"></i> OPEN PAWN SPAWN //
+                <i class="fas fa-fist-raised"></i> FIST DELETE //
+                <i class="fas fa-hand-point-up"></i> POINT AIM
+              </div>
+            </div>
+
+            <!-- Creation mode overlay -->
+            <div id="creation-mode-hud" class="hidden">
+              <div class="creation-indicator">
+                <i class="fas fa-magic"></i> CREATION MODE ACTIVE
+              </div>
+              <div class="creation-coords" id="creation-coords">X: 0.00 Y: 0.00 Z: 0.00</div>
             </div>
           </div>
         </div>
@@ -129,7 +152,6 @@
     </section>
 
     <aside id="right-sidebar" class="hud-panel">
-      <!-- Clock Panel at the top of the right sidebar -->
       <div class="sidebar-subview" style="padding: 15px; border-bottom: 1px solid rgba(0, 243, 255, 0.1); text-align: center;">
         <div class="panel-header" style="border: none; padding: 0 0 5px 0; justify-content: center;">
           <h2 style="font-size: 11px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.4); text-transform: uppercase;">REALTIME_LIVE_CLOCK</h2>
@@ -139,7 +161,7 @@
 
       <div id="sidebar-particles-container" class="sidebar-subview flex-grow-column">
         <div class="panel-header">
-          <h2>PARTICLE_CONTROLS</h2>
+          <h2>SCENE_CONTROLS</h2>
           <span class="sub-header-telemetry">DIAG: CALIBRATING</span>
         </div>
 
@@ -150,8 +172,82 @@
             <div class="webcam-grid"></div>
             <div class="webcam-frame-border"></div>
             <div class="webcam-scanline"></div>
+            <div class="gesture-label-overlay" id="gesture-label"></div>
           </div>
 
+          <!-- GESTURE STATUS -->
+          <div class="telemetry-card">
+            <div class="card-header"><span>GESTURE MODE</span></div>
+            <div class="gesture-mode-grid">
+              <button class="gesture-mode-btn active" data-mode="rotate" id="btn-gesture-rotate" title="Rotate: Move hand">
+                <i class="fas fa-sync-alt"></i> ROTATE
+              </button>
+              <button class="gesture-mode-btn" data-mode="create" id="btn-gesture-create" title="Create: Open palm spawns particles">
+                <i class="fas fa-plus-circle"></i> CREATE
+              </button>
+              <button class="gesture-mode-btn" data-mode="delete" id="btn-gesture-delete" title="Delete: Fist removes nearest object">
+                <i class="fas fa-trash-alt"></i> DELETE
+              </button>
+              <button class="gesture-mode-btn" data-mode="move" id="btn-gesture-move" title="Move: Grab and drag objects">
+                <i class="fas fa-arrows-alt"></i> MOVE
+              </button>
+            </div>
+          </div>
+
+          <!-- 3D MODELS -->
+          <div class="telemetry-card">
+            <div class="card-header"><span>3D MODELS</span></div>
+            <select id="modelSelect" class="hud-select">
+              <option value="none" selected>No Model (Particles Only)</option>
+              <option value="cube">Primitive: Cube</option>
+              <option value="sphere">Primitive: Sphere</option>
+              <option value="torus">Primitive: Torus Knot</option>
+              <option value="cylinder">Primitive: Cylinder</option>
+              <option value="cone">Primitive: Cone</option>
+              <option value="dodecahedron">Primitive: Dodecahedron</option>
+              <option value="icosahedron">Primitive: Icosahedron</option>
+              <option value="custom">Custom Model (Upload .glb/.gltf/.obj)</option>
+            </select>
+            <input type="file" id="modelFileInput" accept=".glb,.gltf,.obj" style="display:none" />
+            <div id="model-upload-area" class="model-upload-area hidden">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Drop .glb/.gltf/.obj here or click to browse</span>
+            </div>
+            <div id="model-info" class="model-info hidden">
+              <span id="model-name">—</span>
+              <span id="model-tris">0 tris</span>
+              <button class="hud-action-btn-danger" id="btn-remove-model" style="font-size:9px;padding:3px 8px;margin-top:4px;">
+                <i class="fas fa-times"></i> REMOVE
+              </button>
+            </div>
+          </div>
+
+          <!-- MODEL TRANSFORM -->
+          <div class="telemetry-card" id="model-transform-section" style="display:none;">
+            <div class="card-header"><span>MODEL TRANSFORM</span></div>
+            <div class="transform-row">
+              <label>POS X</label>
+              <input type="range" id="modelPosX" min="-5" max="5" step="0.1" value="0" class="hud-slider">
+            </div>
+            <div class="transform-row">
+              <label>POS Y</label>
+              <input type="range" id="modelPosY" min="-5" max="5" step="0.1" value="0" class="hud-slider">
+            </div>
+            <div class="transform-row">
+              <label>POS Z</label>
+              <input type="range" id="modelPosZ" min="-5" max="5" step="0.1" value="0" class="hud-slider">
+            </div>
+            <div class="transform-row">
+              <label>SCALE</label>
+              <input type="range" id="modelScale" min="0.1" max="5" step="0.1" value="1" class="hud-slider">
+            </div>
+            <div class="transform-row">
+              <label>ROT Y</label>
+              <input type="range" id="modelRotY" min="0" max="6.28" step="0.05" value="0" class="hud-slider">
+            </div>
+          </div>
+
+          <!-- PARTICLE SETTINGS -->
           <div class="telemetry-card">
             <div class="card-header"><span>NODE QUANTITY</span></div>
             <select id="particleCount" class="hud-select">
@@ -159,6 +255,7 @@
               <option value="2000" selected>2,000 nodes</option>
               <option value="5000">5,000 nodes</option>
               <option value="10000">10,000 nodes</option>
+              <option value="20000">20,000 nodes</option>
             </select>
           </div>
 
@@ -168,12 +265,20 @@
               <option value="sphere" selected>Sphere Grid</option>
               <option value="box">Hypercube Matrix</option>
               <option value="galaxy">Nebula Spiral</option>
+              <option value="torus">Torus Ring</option>
+              <option value="helix">DNA Helix</option>
+              <option value="terrain">Terrain Mesh</option>
             </select>
           </div>
 
           <div class="telemetry-card">
             <div class="card-header"><span>NODE RADIUS SCALE</span></div>
-            <input type="range" id="particleSize" min="0.005" max="0.1" step="0.005" value="0.02" class="hud-slider">
+            <input type="range" id="particleSize" min="0.005" max="0.15" step="0.005" value="0.02" class="hud-slider">
+          </div>
+
+          <div class="telemetry-card">
+            <div class="card-header"><span>PARTICLE OPACITY</span></div>
+            <input type="range" id="particleOpacity" min="0.1" max="1" step="0.05" value="0.85" class="hud-slider">
           </div>
 
           <div class="telemetry-card">
@@ -186,6 +291,30 @@
             <input type="color" id="accentColor" value="#00f3ff" class="hud-color-picker">
           </div>
 
+          <!-- CREATION MODE -->
+          <div class="hud-control-group">
+            <h3>CREATION ENGINE</h3>
+            <button class="hud-action-btn" id="btn-creation-mode">
+              <span class="indicator"></span> CREATION MODE
+            </button>
+            <select id="spawnShape" class="hud-select" style="margin-top:4px;">
+              <option value="burst">Burst (Radial)</option>
+              <option value="ring">Ring (Circular)</option>
+              <option value="line">Line (Directional)</option>
+              <option value="spray">Spray (Random)</option>
+              <option value="trail">Trail (Follow Hand)</option>
+            </select>
+            <div class="transform-row" style="margin-top:6px;">
+              <label>SPAWN COUNT</label>
+              <input type="range" id="spawnCount" min="10" max="500" step="10" value="100" class="hud-slider">
+            </div>
+            <div class="transform-row">
+              <label>SPAWN VELOCITY</label>
+              <input type="range" id="spawnVelocity" min="0.5" max="10" step="0.5" value="3" class="hud-slider">
+            </div>
+          </div>
+
+          <!-- SPATIAL MODES -->
           <div class="hud-control-group">
             <h3>SPATIAL MODES</h3>
             <button class="hud-action-btn active" id="btn-autoRotate">
@@ -194,14 +323,34 @@
             <button class="hud-action-btn active" id="btn-gestures">
               <span class="indicator green"></span> CAMERA GESTURES
             </button>
+            <button class="hud-action-btn" id="btn-physics">
+              <span class="indicator"></span> PARTICLE PHYSICS
+            </button>
+            <button class="hud-action-btn" id="btn-wireframe">
+              <span class="indicator"></span> WIREFRAME MODE
+            </button>
+          </div>
+
+          <!-- SCENE ACTIONS -->
+          <div class="hud-control-group">
+            <h3>SCENE ACTIONS</h3>
+            <button class="hud-action-btn" id="btn-reset-scene">
+              <i class="fas fa-undo"></i> RESET SCENE
+            </button>
+            <button class="hud-action-btn" id="btn-export-scene">
+              <i class="fas fa-download"></i> EXPORT OBJ
+            </button>
+            <button class="hud-action-btn" id="btn-screenshot">
+              <i class="fas fa-camera"></i> SCREENSHOT
+            </button>
           </div>
         </div>
 
         <div class="ticker-box sidebar-ticker" id="system-logs-ticker">
           <div class="ticker-title">REALTIME_EVENT_LOG <span class="click-hint">// CLICK TO OPEN</span></div>
           <div class="ticker-content" id="ticker-events">
-            <div class="ticker-item">[SYS] Active memory registers initialized.</div>
-            <div class="ticker-item">[SYS] Listening on IPC render-frame channels.</div>
+            <div class="ticker-item">[SYS] 3D Scene Engine loaded. Models & creation ready.</div>
+            <div class="ticker-item">[SYS] Gesture modes: Rotate, Create, Delete, Move.</div>
           </div>
         </div>
       </div>
@@ -230,7 +379,6 @@
           <button id="btn-close-modal" class="modal-close-btn"><i class="fas fa-times"></i></button>
         </div>
       </header>
-
       <section class="modal-toolbar">
         <div class="filter-group">
           <button class="filter-btn active" data-filter="all">ALL_LOGS</button>
@@ -243,11 +391,9 @@
           LOGS_COUNT: <span id="modal-logs-count">0</span>
         </div>
       </section>
-
       <main id="modal-logs-body" class="scrollable">
         <div id="modal-logs-list"></div>
       </main>
-
       <footer class="modal-footer-box">
         <div class="footer-left">
           <span>SECURE CORE LOGGER // 127.0.0.1</span>
@@ -266,6 +412,7 @@
 
   <script src="shared.js"></script>
   <script src="particles.js"></script>
+  <script src="page-voice.js"></script>
   <script src="nav-windows.js"></script>
 </body>
 </html>

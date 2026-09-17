@@ -9,6 +9,61 @@
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="style.css">
+  <style>
+    .yt-tabs { display: flex; gap: 2px; border-bottom: 1px solid rgba(0, 243, 255, 0.15); padding: 0 4px; }
+    .yt-tab { flex: 1; background: transparent; border: 1px solid transparent; color: rgba(255,255,255,0.45); font-family: var(--font-hud); font-size: 9px; letter-spacing: 1px; font-weight: 600; padding: 8px 2px; cursor: pointer; border-radius: 4px 4px 0 0; transition: all 0.15s; }
+    .yt-tab:hover { color: #fff; background: var(--accent-cyan-dim); }
+    .yt-tab.active { color: var(--accent-cyan); background: rgba(0, 243, 255, 0.08); border-color: rgba(0, 243, 255, 0.25); box-shadow: inset 0 -2px 0 var(--accent-cyan); text-shadow: 0 0 8px var(--accent-cyan-glow); }
+
+    .yt-pane { display: none; flex: 1; min-height: 0; flex-direction: column; }
+    .yt-pane.active { display: flex; }
+    .yt-pane-scroll { flex: 1; min-height: 0; }
+    .yt-pane-head { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid rgba(0, 243, 255, 0.12); }
+    .yt-pane-head .hud-input { flex: 1; }
+    .yt-pane-head .hud-action-btn-primary { padding: 8px 12px; font-size: 9px; }
+
+    .yt-pl-item, .yt-sub-item { display: flex; align-items: center; gap: 8px; padding: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; margin: 6px 8px; cursor: pointer; transition: all 0.15s; }
+    .yt-pl-item:hover, .yt-sub-item:hover { background: var(--accent-cyan-dim); border-color: rgba(0,243,255,0.3); }
+    .yt-pl-info, .yt-sub-info { flex: 1; min-width: 0; }
+    .yt-pl-name, .yt-sub-name { font-family: var(--font-hud); font-size: 10px; letter-spacing: 0.5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .yt-pl-meta, .yt-sub-meta { font-family: var(--font-mono); font-size: 9px; color: var(--accent-cyan); }
+    .yt-pl-open, .yt-pl-del, .yt-sub-rm { padding: 6px 8px; font-size: 9px; }
+    .yt-pl-back { margin: 8px; padding: 8px; font-size: 9px; }
+    .yt-pl-detail-name { font-family: var(--font-hud); font-size: 12px; letter-spacing: 1px; color: var(--accent-cyan); padding: 8px; text-shadow: 0 0 8px var(--accent-cyan-glow); }
+    .yt-pl-video { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin: 4px 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; }
+    .yt-pl-v-thumb { width: 52px; height: 34px; flex-shrink: 0; border-radius: 3px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+    .yt-pl-v-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .yt-pl-v-info { flex: 1; min-width: 0; }
+    .yt-pl-v-title { font-size: 11px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .yt-pl-v-meta { font-family: var(--font-mono); font-size: 9px; color: rgba(255,255,255,0.4); }
+    .yt-pl-v-open, .yt-pl-v-rm { padding: 6px 8px; font-size: 9px; }
+
+    .yt-sub-thumb { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--accent-purple-dim); color: var(--accent-purple); border: 1px solid rgba(157,78,221,0.3); flex-shrink: 0; }
+    .yt-sub-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+    .yt-rpt { padding: 10px; }
+    .yt-rpt-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+    .yt-rpt-thumb { width: 60px; height: 60px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--accent-purple-dim); color: var(--accent-purple); border: 1px solid rgba(157,78,221,0.35); flex-shrink: 0; }
+    .yt-rpt-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .yt-rpt-title { font-family: var(--font-hud); font-size: 13px; letter-spacing: 0.5px; color: #fff; text-shadow: 0 0 8px var(--accent-cyan-glow); }
+    .yt-rpt-sub { font-family: var(--font-mono); font-size: 10px; color: var(--accent-cyan); margin-top: 2px; }
+    .yt-rpt-channel { font-family: var(--font-mono); font-size: 9px; color: rgba(255,255,255,0.35); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .yt-rpt-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+    .yt-rpt-stat { background: rgba(255,255,255,0.02); border: 1px solid rgba(0,243,255,0.15); border-radius: 4px; padding: 8px 6px; text-align: center; }
+    .yt-rpt-num { display: block; font-family: var(--font-hud); font-size: 13px; color: var(--accent-gold); text-shadow: 0 0 8px var(--accent-gold-glow); white-space: nowrap; }
+    .yt-rpt-lbl { display: block; font-family: var(--font-mono); font-size: 8px; color: rgba(255,255,255,0.5); letter-spacing: 1px; margin-top: 4px; }
+    .yt-rpt-section-title { font-family: var(--font-hud); font-size: 10px; letter-spacing: 1px; color: var(--accent-purple); margin: 8px 0 6px; }
+    .yt-rpt-video { display: flex; align-items: center; gap: 8px; padding: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; margin-bottom: 4px; }
+    .yt-rpt-v-title { flex: 1; min-width: 0; font-size: 10px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .yt-rpt-v-bar { width: 70px; flex-shrink: 0; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .yt-rpt-v-fill { height: 100%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)); }
+    .yt-rpt-v-views { font-family: var(--font-mono); font-size: 9px; color: var(--accent-gold); width: 60px; text-align: right; }
+    .yt-rpt-country { font-family: var(--font-mono); font-size: 9px; color: var(--accent-cyan); margin-top: 6px; }
+    .yt-rpt-desc { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 6px; border-left: 2px solid var(--accent-cyan-dim); padding-left: 8px; }
+
+    .yt-toast { position: fixed; bottom: 22px; right: 22px; z-index: 9999; max-width: 340px; background: rgba(6,8,16,0.92); border: 1px solid var(--accent-cyan); box-shadow: 0 0 16px var(--accent-cyan-glow); color: #fff; font-family: var(--font-mono); font-size: 11px; padding: 10px 14px; border-radius: 4px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: all 0.2s; }
+    .yt-toast.show { opacity: 1; transform: translateY(0); }
+  </style>
 </head>
 <body>
 
@@ -77,6 +132,10 @@
           <div class="nav-icon"><i class="fas fa-database"></i></div>
           <div class="nav-label"><span class="nav-label-main">KNOWLEDGE_BASE</span><span class="nav-label-sub">RAG Document Store</span></div>
         </div>
+        <div class="nav-rail-item" onclick="window.location.href='mcp.html'">
+          <div class="nav-icon"><i class="fas fa-plug"></i></div>
+          <div class="nav-label"><span class="nav-label-main">MCP_SERVERS</span><span class="nav-label-sub">Connect Any App</span></div>
+        </div>
         <div class="nav-rail-item active">
           <div class="nav-icon"><i class="fab fa-youtube"></i></div>
           <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
@@ -99,7 +158,7 @@
             <div class="yt-banner-icon"><i class="fab fa-youtube"></i></div>
             <div class="yt-banner-text">
               <div class="yt-banner-title">YOUTUBE_CONTROL — DATA API V3</div>
-              <div class="yt-banner-sub">Cerca, filtra ed esplora video su YouTube con pieno controllo.<br>Utilizza la YouTube Data API v3 per risultati in tempo reale.</div>
+              <div class="yt-banner-sub">Cerca, filtra ed esplora video su YouTube con pieno controllo.<br>Comandi vocali: <b>cerca su youtube …</b> · <b>aggiungi/rimuovi dalla playlist …</b> · <b>iscriviti al canale …</b> · <b>analizza canale …</b></div>
             </div>
           </div>
         </div>
@@ -134,12 +193,33 @@
           </div>
 
           <div class="yt-right hud-panel flex-grow-column" id="yt-detail">
-            <div class="panel-header">
-              <h2>DETTAGLI</h2>
-              <span class="sub-header-telemetry">video info</span>
+            <div class="yt-tabs">
+              <button class="yt-tab active" data-pane="detail" onclick="switchPane('detail')">DETTAGLI</button>
+              <button class="yt-tab" data-pane="playlist" onclick="switchPane('playlist')">PLAYLIST</button>
+              <button class="yt-tab" data-pane="subs" onclick="switchPane('subs')">ISCRITTI</button>
+              <button class="yt-tab" data-pane="analyze" onclick="switchPane('analyze')">ANALISI</button>
             </div>
-            <div class="panel-content scrollable" id="yt-detail-content">
-              <div class="yt-empty">Seleziona un video per vedere i dettagli.</div>
+
+            <div class="yt-pane active" id="yt-pane-detail">
+              <div class="panel-content scrollable yt-pane-scroll" id="yt-detail-content">
+                <div class="yt-empty">Seleziona un video per vedere i dettagli e le azioni rapide (PLAYLIST, ISCRIVITI, ANALIZZA).</div>
+              </div>
+            </div>
+
+            <div class="yt-pane" id="yt-pane-playlist">
+              <div class="yt-pane-head">
+                <input type="text" id="yt-pl-name" class="hud-input" placeholder="Nuova playlist" maxlength="40" />
+                <button class="hud-action-btn-primary" id="yt-pl-create"><i class="fas fa-plus"></i> CREA</button>
+              </div>
+              <div class="panel-content scrollable yt-pane-scroll" id="yt-pl-content"></div>
+            </div>
+
+            <div class="yt-pane" id="yt-pane-subs">
+              <div class="panel-content scrollable yt-pane-scroll" id="yt-subs-content"></div>
+            </div>
+
+            <div class="yt-pane" id="yt-pane-analyze">
+              <div class="panel-content scrollable yt-pane-scroll" id="yt-analyze-content"></div>
             </div>
           </div>
         </div>
@@ -151,12 +231,14 @@
   </main>
 
   <div id="hud-scanlines"></div>
+  <div id="yt-toast" class="yt-toast"></div>
 
   <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
   <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="auto"></audio>
 
   <script src="shared.js"></script>
   <script src="youtube.js"></script>
+  <script src="page-voice.js"></script>
   <script src="nav-windows.js"></script>
 </body>
 </html>

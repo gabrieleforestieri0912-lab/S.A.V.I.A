@@ -204,11 +204,6 @@ cfgThreshold?.addEventListener('input', () => { outThreshold.textContent = cfgTh
 chkAuto?.addEventListener('change', () => saveSettings());
 
 // ── Add / edit known device ─────────────────────────────────────
-function nextTypeMacHint(list, mac) {
-  const found = list.find(d => d.mac === mac);
-  return found ? (found.name || '') : '';
-}
-
 function startAddDevice(mac, name) {
   mac = mac.toUpperCase();
   const known = (currentStatus && currentStatus.knownDevices) || [];

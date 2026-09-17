@@ -9,8 +9,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   windowMaximize: () => ipcRenderer.send('window-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),
 
+  // Power-on vocale: risveglia la finestra principale dalla tray
+  revealWindow: () => ipcRenderer.send('window-reveal'),
+
+  // STT locale (Whisper via main process) — fallback al cloud Speech API
+  sttLoad: () => ipcRenderer.invoke('stt-load'),
+  sttTranscribe: (pcm16) => ipcRenderer.invoke('stt-transcribe', pcm16),
+
   // Tool windows: apri pagina tool in nuova finestra (index.html → focus main)
   openToolPage: (page) => ipcRenderer.invoke('open-tool-page', page),
+
+  // Spegnimento completo di S.A.V.I.A (chiesto da chat/vocale)
+  quitApp: () => ipcRenderer.invoke('app-quit'),
 
   // Real-time telemetry receiver (push from main)
   onTelemetryUpdate: (callback) => {
@@ -47,8 +57,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDrives: () => ipcRenderer.invoke('get-drives'),
 
   // ============================================================
-  // COMMAND CENTER — TERMINAL
+  // COMMAND CENTER — TERMINAL (PTY-based)
   // ============================================================
+  terminalPtyCreate: (opts) => ipcRenderer.invoke('terminal-pty-create', opts),
+  terminalPtyWrite: (ptyId, data) => ipcRenderer.invoke('terminal-pty-write', { ptyId, data }),
+  terminalPtyResize: (ptyId, cols, rows) => ipcRenderer.invoke('terminal-pty-resize', { ptyId, cols, rows }),
+  terminalPtyKill: (ptyId) => ipcRenderer.invoke('terminal-pty-kill', { ptyId }),
+  terminalPtyCwd: (ptyId) => ipcRenderer.invoke('terminal-pty-cwd', { ptyId }),
+  onTerminalPtyData: (callback) => {
+    ipcRenderer.on('terminal-pty-data', (event, data) => callback(data));
+  },
+  removeTerminalPtyListeners: () => {
+    ipcRenderer.removeAllListeners('terminal-pty-data');
+  },
+  // Cross-window terminal voice commands
+  sendTerminalVoiceCommand: (payload) => ipcRenderer.send('terminal-voice-command', payload),
+  onTerminalVoiceCommand: (callback) => {
+    ipcRenderer.on('terminal-voice-command', (event, data) => callback(data));
+  },
+  // Cross-page voice commands: any page → main → index.html
+  sendVoiceFromPage: (payload) => ipcRenderer.send('voice-from-page', payload),
+  onVoiceFromPage: (callback) => {
+    ipcRenderer.on('voice-from-page', (event, data) => callback(data));
+  },
+  // Legacy (kept for backward compat)
   terminalSetCwd: (newCwd) => ipcRenderer.invoke('terminal-set-cwd', newCwd),
   terminalGetCwd: () => ipcRenderer.invoke('terminal-get-cwd'),
   terminalExecute: (command) => ipcRenderer.invoke('terminal-execute', command),
@@ -82,12 +114,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
   systemListProcesses: () => ipcRenderer.invoke('system-list-processes'),
   systemMedia: (opts) => ipcRenderer.invoke('system-media', opts),
   systemScreenshot: () => ipcRenderer.invoke('system-screenshot'),
+  systemOpenUrl: (url) => ipcRenderer.invoke('system-open-url', url),
+
+  // Extended stats (async, non-blocking)
+  getNetworkThroughput: () => ipcRenderer.invoke('get-network-throughput'),
+  getGpuUsage: () => ipcRenderer.invoke('get-gpu-usage'),
+  getDiskIO: () => ipcRenderer.invoke('get-disk-io'),
 
   // ============================================================
   // APP CONFIG (savia-config.json — API keys, model, settings)
   // ============================================================
   configGet: () => ipcRenderer.invoke('config-get'),
   configSet: (patch) => ipcRenderer.invoke('config-set', patch),
+
+  // ============================================================
+  // MCP SERVERS (Model Context Protocol → Any App)
+  // ============================================================
+  mcpStatus: () => ipcRenderer.invoke('mcp-status'),
+  mcpSave: (server) => ipcRenderer.invoke('mcp-save', server),
+  mcpRemove: (id) => ipcRenderer.invoke('mcp-remove', id),
+  mcpStart: (id) => ipcRenderer.invoke('mcp-start', id),
+  mcpStop: (id) => ipcRenderer.invoke('mcp-stop', id),
+  mcpListTools: () => ipcRenderer.invoke('mcp-list-tools'),
+  mcpCallTool: (opts) => ipcRenderer.invoke('mcp-call-tool', opts),
+  onMcpEvent: (callback) => {
+    ipcRenderer.on('mcp-event', (event, data) => callback(data));
+  },
 
   // ============================================================
   // REMINDER / CALENDAR FIRED (push from main)

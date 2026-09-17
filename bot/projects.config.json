@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "name": "curriculuxe",
+      "path": "C:\\path\\to\\curriculuxe",
+      "aliases": ["curriculuxe", "cv platform", "cv"]
+    },
+    {
+      "name": "semplycode",
+      "path": "C:\\path\\to\\semplycode",
+      "aliases": ["semplycode", "semply", "code review"]
+    }
+  ]
+}

@@ -2,10 +2,7 @@
  * S.A.V.I.A - Calendar (Month View + Notion Events)
  */
 
-const NOTION_API = 'https://api.notion.com/v1';
-const NOTION_VERSION = '2022-06-28';
-
-let calNotionKey = localStorage.getItem('calendar-notion-key') || localStorage.getItem('notion-api-key') || '';
+// Notion è raggiunto tramite un server MCP (es. @notionhq/notion-mcp-server).
 let calNotionDb = localStorage.getItem('calendar-notion-db') || '';
 
 let calDate = new Date();
@@ -30,46 +27,20 @@ const eventAdd = document.getElementById('cal-event-add');
 const eventClose = document.getElementById('cal-event-close');
 const calStatCount = document.getElementById('cal-stat-count');
 const calStatMonth = document.getElementById('cal-stat-month');
-const calKeyInput = document.getElementById('cal-notion-key');
+const calServerSelect = document.getElementById('cal-notion-server');
 const calDbInput = document.getElementById('cal-notion-db');
 const calSaveBtn = document.getElementById('cal-notion-save');
 
 let selectedDay = null;
 
-// ── Notion API ──
-
-async function notionRequest(endpoint, options = {}) {
-  if (!calNotionKey) throw new Error('Notion API key non configurata');
-  const res = await fetch(`${NOTION_API}${endpoint}`, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${calNotionKey}`,
-      'Notion-Version': NOTION_VERSION,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `Notion API: ${res.status}`);
-  }
-  return res.json();
-}
+// ── Notion (via MCP) ──
 
 async function notionQueryDatabase(databaseId, filter) {
-  const body = { page_size: 100 };
-  if (filter) body.filter = filter;
-  return notionRequest(`/databases/${databaseId}/query`, {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
+  return SaviaNotionMCP.queryDatabase(databaseId, filter);
 }
 
 async function notionCreatePage(databaseId, properties) {
-  return notionRequest('/pages', {
-    method: 'POST',
-    body: JSON.stringify({ parent: { database_id: databaseId }, properties })
-  });
+  return SaviaNotionMCP.createPage(databaseId, properties);
 }
 
 // ── Calendar Logic ──
@@ -180,7 +151,7 @@ async function addCalendarEvent() {
   eventInput.value = '';
   if (eventTime) eventTime.value = '';
 
-  if (calNotionDb && calNotionKey) {
+  if (calNotionDb) {
     try {
       const props = {
         Name: { title: [{ text: { content: text } }] },
@@ -194,7 +165,8 @@ async function addCalendarEvent() {
 }
 
 async function syncFromNotion() {
-  if (!calNotionDb || !calNotionKey) return;
+  if (!calNotionDb) return;
+  SaviaNotionMCP.setServerId(calServerSelect?.value?.trim() || '');
   try {
     const data = await notionQueryDatabase(calNotionDb);
     const notionEvents = data.results.map(p => {
@@ -231,18 +203,37 @@ function deleteCalendarEvent(id) {
   addCalLog('Evento eliminato.');
 }
 
-// ── Config ──
+// ── Config (via MCP) ──
 
-function loadCalConfig() {
-  if (calKeyInput) calKeyInput.value = calNotionKey;
+async function refreshCalServers() {
+  if (!calServerSelect) return;
+  const servers = await SaviaNotionMCP.listServers();
+  const prev = calServerSelect.value;
+  calServerSelect.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = '';
+  auto.textContent = '— auto-detect (server con tool notion_*) —';
+  calServerSelect.appendChild(auto);
+  for (const s of servers) {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = `${s.name} [${s.status === 'on' ? 'ON' : s.status}]`;
+    calServerSelect.appendChild(o);
+  }
+  const selected = localStorage.getItem('notion-mcp-server-id') || (await SaviaNotionMCP.resolveServerId()) || prev;
+  calServerSelect.value = selected || '';
+}
+
+async function loadCalConfig() {
+  calNotionDb = localStorage.getItem('calendar-notion-db') || '';
+  await refreshCalServers();
   if (calDbInput) calDbInput.value = calNotionDb;
 }
 
-function saveCalConfig() {
-  calNotionKey = calKeyInput?.value?.trim() || '';
+async function saveCalConfig() {
   calNotionDb = calDbInput?.value?.trim() || '';
-  localStorage.setItem('calendar-notion-key', calNotionKey);
   localStorage.setItem('calendar-notion-db', calNotionDb);
+  SaviaNotionMCP.setServerId(calServerSelect?.value?.trim() || '');
   addCalLog('Configurazione salvata.');
   syncFromNotion();
 }
@@ -321,5 +312,5 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCalendar();
   syncCalendarToMain();
   loadAgentCalendarEvents();
-  if (calNotionDb && calNotionKey) setTimeout(syncFromNotion, 1000);
+  if (calNotionDb) setTimeout(syncFromNotion, 1000);
 });

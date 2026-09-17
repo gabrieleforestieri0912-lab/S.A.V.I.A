@@ -14,10 +14,16 @@ const typingIndicator = document.getElementById('typing-indicator');
 const systemBridgeStatus = document.getElementById('system-bridge-status');
 
 // ── Configurazione runtime (persistita in savia-config.json via IPC) ──
-let activeModel = localStorage.getItem('savia-model') || 'mistral';
+function getDefaultModel() {
+  if (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter') return 'nvidia/nemotron-3.5-lightning:free';
+  if (typeof aiProvider !== 'undefined' && aiProvider === 'opencode') return 'claude-sonnet-4-5';
+  return 'mistral';
+}
+
+let activeModel = localStorage.getItem('savia-model') || getDefaultModel();
 
 function getActiveModel() {
-  return activeModel || 'mistral';
+  return activeModel || getDefaultModel();
 }
 
 async function loadRuntimeConfig() {
@@ -25,32 +31,70 @@ async function loadRuntimeConfig() {
     if (window.electronAPI && window.electronAPI.configGet) {
       const cfg = await window.electronAPI.configGet();
       if (cfg) {
-        if (cfg.elevenLabsKey) ELEVENLABS_API_KEY = cfg.elevenLabsKey;
+        if (cfg.aiProvider) aiProvider = cfg.aiProvider;
+        if (cfg.openrouterApiKey) openrouterApiKey = cfg.openrouterApiKey;
+        if (cfg.opencodeApiKey) opencodeApiKey = cfg.opencodeApiKey;
         if (cfg.activeModel) activeModel = cfg.activeModel;
       }
     }
   } catch (e) { /* ignore */ }
+  if ((typeof aiProvider !== 'undefined' && aiProvider === 'openrouter') && (!activeModel || activeModel === 'mistral' || activeModel === 'claude-sonnet-4-5')) {
+    activeModel = 'nvidia/nemotron-3.5-lightning:free';
+    localStorage.setItem('savia-model', activeModel);
+  }
   if (window.electronAPI && window.electronAPI.configSet) {
-    try { await window.electronAPI.configSet({ activeModel }); } catch (e) { /* ignore */ }
+    try {
+      await window.electronAPI.configSet({
+        aiProvider: typeof aiProvider !== 'undefined' ? aiProvider : 'openrouter',
+        openrouterApiKey: typeof openrouterApiKey !== 'undefined' ? openrouterApiKey : '',
+        opencodeApiKey: typeof opencodeApiKey !== 'undefined' ? opencodeApiKey : '',
+        activeModel
+      });
+    } catch (e) { /* ignore */ }
   }
 }
 
-// Popola il selettore modello con i modelli installati su Ollama
+// Popola il selettore modello con i modelli installati su OpenRouter / OpenCode / Ollama
 async function refreshModelList() {
   const sel = document.getElementById('model-select');
   if (!sel) return;
   try {
-    const res = await fetch(`${OLLAMA_HOST}/api/tags`);
-    if (!res.ok) return;
-    const data = await res.json();
-    const models = (data.models || []).map(m => m.name);
+    let models = [];
+    const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
+    const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
+
+    if (isOpenRouter) {
+      const res = await fetch(`${openrouterBaseUrl}/models`, {
+        headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const all = (data.data || []).map(m => m.id);
+      const free = all.filter(m => m.endsWith(':free'));
+      const paid = all.filter(m => !m.endsWith(':free'));
+      models = [...free, ...paid];
+    } else if (isOpenCode) {
+      const res = await fetch(`${opencodeBaseUrl}/models`, {
+        headers: { 'Authorization': `Bearer ${opencodeApiKey}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      models = (data.data || []).map(m => m.id);
+    } else {
+      const res = await fetch(`${OLLAMA_HOST}/api/tags`);
+      if (!res.ok) return;
+      const data = await res.json();
+      models = (data.models || []).map(m => m.name);
+    }
     if (!models.length) return;
     sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
-    // Risolvi il modello attivo: se quello salvato non è installato, usa il primo disponibile
+    // Risolvi il modello attivo: se quello salvato non è installato, usa il preferito o il primo
     if (models.includes(activeModel)) {
       sel.value = activeModel;
     } else {
-      activeModel = models[0];
+      activeModel = isOpenRouter
+        ? (models.includes('nvidia/nemotron-3.5-lightning:free') ? 'nvidia/nemotron-3.5-lightning:free' : models[0])
+        : ((isOpenCode && models.includes('claude-sonnet-4-5')) ? 'claude-sonnet-4-5' : models[0]);
       sel.value = activeModel;
     }
     localStorage.setItem('savia-model', activeModel);
@@ -61,238 +105,33 @@ function applyModelToUI() {
   const sel = document.getElementById('model-select');
   if (sel) sel.value = activeModel;
   const modelInfo = document.getElementById('chat-model-info');
-  if (modelInfo) modelInfo.textContent = `INTELLIGENZA: OLLAMA // ${activeModel.toUpperCase()}`;
+  const providerLabel = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter')
+    ? 'OPENROUTER'
+    : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OPENCODE' : 'OLLAMA');
+  if (modelInfo) modelInfo.textContent = `INTELLIGENZA: ${providerLabel} // ${activeModel.toUpperCase()}`;
   const modelStatus = document.getElementById('model-status-text');
   if (modelStatus) modelStatus.textContent = `ACTIVE MODEL // ${activeModel.toUpperCase()}`;
 }
 
 if (document.getElementById('model-select')) {
   document.getElementById('model-select').addEventListener('change', function() {
-    activeModel = this.value || 'mistral';
+    activeModel = this.value || getDefaultModel();
     localStorage.setItem('savia-model', activeModel);
     if (window.electronAPI && window.electronAPI.configSet) {
       window.electronAPI.configSet({ activeModel }).catch(() => {});
     }
     applyModelToUI();
-    addTickerEvent('ollama', `Modello AI cambiato: ${activeModel}`);
+    const providerLabel = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter')
+      ? 'OpenRouter'
+      : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OpenCode' : 'Ollama');
+    addTickerEvent('agent', `Modello AI cambiato (${providerLabel}): ${activeModel}`);
   });
 }
 
 let welcomeSent = sessionStorage.getItem('savia-welcome-sent') === 'true';
-
-function getCurrentPage() {
-  const p = window.location.pathname.split('/').pop();
-  return p || 'index.html';
-}
-
-const ACTION_MAP = {
-  // ── Navigation ──
-  navigate_index:        { el: null, fn: () => { window.saviaOpen('index.html'); }, pages: ['particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_particles:    { el: null, fn: () => { window.saviaOpen('particles.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_terminal:     { el: null, fn: () => { window.saviaOpen('terminal.html'); }, pages: ['index.html','particles.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_knowledge:    { el: null, fn: () => { window.saviaOpen('knowledge.html'); }, pages: ['index.html','particles.html','terminal.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_globe:        { el: null, fn: () => { window.saviaOpen('globe.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_objectives:   { el: null, fn: () => { window.saviaOpen('objectives.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','imagine.html','calendar.html'] },
-  navigate_calendar:     { el: null, fn: () => { window.saviaOpen('calendar.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','imagine.html'] },
-  navigate_imagine:      { el: null, fn: () => { window.saviaOpen('imagine.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','calendar.html'] },
-
-  // ── System toggles ──
-  toggle_overclock:      { el: 'btn-overclock', fn: null, pages: ['index.html','terminal.html'] },
-  toggle_sound:          { el: 'btn-sound', fn: null, pages: ['index.html','terminal.html'] },
-  toggle_scanlines:      { el: 'btn-scanlines', fn: null, pages: ['index.html','terminal.html'] },
-
-  // ── Voice controls ──
-  toggle_wake:           { el: 'vc-wake-toggle', fn: null, pages: ['index.html'] },
-  toggle_continuous:     { el: 'vc-continuous-toggle', fn: null, pages: ['index.html'] },
-  toggle_autospeak:      { el: 'btn-auto-speak', fn: null, pages: ['index.html'] },
-
-  // ── Globe controls ──
-  toggle_globe_rotate:   { el: 'btn-globe-rotate', fn: null, pages: ['globe.html'] },
-  globe_global_view:     { el: 'btn-view-global', fn: null, pages: ['globe.html'] },
-  toggle_globe_gestures: { el: 'btn-globe-gestures', fn: null, pages: ['globe.html'] },
-  globe_city_back:       { el: 'btn-city-back', fn: null, pages: ['globe.html'] },
-
-  // ── Particles controls ──
-  toggle_particles_rotate:  { el: 'btn-autoRotate', fn: null, pages: ['particles.html'] },
-  toggle_particles_gestures: { el: 'btn-gestures', fn: null, pages: ['particles.html'] },
-  particles_set_count:   { el: 'particleCount', fn: null, pages: ['particles.html'] },
-  particles_set_shape:   { el: 'shapeSelect', fn: null, pages: ['particles.html'] },
-  particles_set_size:    { el: 'particleSize', fn: null, pages: ['particles.html'] },
-
-  // ── Terminal controls ──
-  terminal_clear:        { el: 'term-clear', fn: null, pages: ['terminal.html'] },
-  terminal_kill:         { el: 'term-kill', fn: null, pages: ['terminal.html'] },
-  fb_refresh:            { el: 'fb-refresh', fn: null, pages: ['terminal.html'] },
-  fb_back:               { el: 'fb-back', fn: null, pages: ['terminal.html'] },
-  fb_forward:            { el: 'fb-forward', fn: null, pages: ['terminal.html'] },
-  fb_up:                 { el: 'fb-up', fn: null, pages: ['terminal.html'] },
-
-  // ── Knowledge base ──
-  kb_index:              { el: 'kb-index-btn', fn: null, pages: ['knowledge.html'] },
-
-  // ── Memory ──
-  memory_scan_projects:  { el: 'mem-scan-btn', fn: null, pages: ['index.html'] },
-
-  // ── YouTube ──
-  navigate_youtube:      { el: null, fn: () => { window.saviaOpen('youtube.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_face_training:{ el: null, fn: () => { window.saviaOpen('face-training.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
-  navigate_hotline:      { el: null, fn: () => { window.saviaOpen('hotline.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
-  navigate_proximity:    { el: null, fn: () => { window.saviaOpen('proximity.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
-  yt_search:             { el: null, fn: () => {
-    const input = document.getElementById('yt-search-input');
-    const btn = document.getElementById('yt-search-btn');
-    if (input && btn) { input.focus(); }
-  }, pages: ['youtube.html'] },
-
-  // ── Logs ──
-  open_logs:             { el: 'system-logs-ticker', fn: null, pages: ['index.html','particles.html','terminal.html','globe.html','knowledge.html','youtube.html','objectives.html'] },
-};
-
-function executeAction(actionId) {
-  const action = ACTION_MAP[actionId];
-  if (!action) { addTickerEvent('warn', `Unknown action: ${actionId}`); return false; }
-
-  const current = getCurrentPage();
-  if (!action.pages.includes(current)) {
-    addTickerEvent('warn', `Action "${actionId}" not available in ${current}`);
-    return false;
-  }
-
-  if (action.fn) {
-    action.fn();
-    addTickerEvent('agent', `Action executed: ${actionId}`);
-    return true;
-  }
-
-  const el = document.getElementById(action.el);
-  if (!el) { addTickerEvent('warn', `Element "${action.el}" not found for ${actionId}`); return false; }
-
-  if (el.tagName === 'SELECT') {
-    el.dispatchEvent(new Event('change'));
-  } else {
-    el.click();
-  }
-  addTickerEvent('agent', `Action executed: ${actionId}`);
-  return true;
-}
-
-const ACTION_KEYWORDS = {
-  // Navigation
-  'vai alla dashboard': 'navigate_index',
-  'vai alla home': 'navigate_index',
-  'torna alla home': 'navigate_index',
-  'apri la home': 'navigate_index',
-  'vai alle particelle': 'navigate_particles',
-  'apri le particelle': 'navigate_particles',
-  'mostra le particelle': 'navigate_particles',
-  'vai al terminale': 'navigate_terminal',
-  'apri il terminale': 'navigate_terminal',
-  'vai al command center': 'navigate_terminal',
-  'vai alla knowledge base': 'navigate_knowledge',
-  'apri la knowledge base': 'navigate_knowledge',
-  'vai al globo': 'navigate_globe',
-  'apri il globo': 'navigate_globe',
-  'vai al global timeline': 'navigate_globe',
-  'vai agli obiettivi': 'navigate_objectives',
-  'apri obiettivi': 'navigate_objectives',
-  'vai a objectives hub': 'navigate_objectives',
-  'vai agli objectives': 'navigate_objectives',
-  'vai al calendario': 'navigate_calendar',
-  'apri calendario': 'navigate_calendar',
-  'vai a calendar': 'navigate_calendar',
-  'addestra il volto': 'navigate_face_training',
-  'apri face training': 'navigate_face_training',
-  'vai al face training': 'navigate_face_training',
-  'addestramento facciale': 'navigate_face_training',
-  'vai alla hotline': 'navigate_hotline',
-  'apri la hotline': 'navigate_hotline',
-  'apri hotline': 'navigate_hotline',
-  'chiamata telefonica': 'navigate_hotline',
-  'vai alla prossimità': 'navigate_proximity',
-  'apri la prossimità': 'navigate_proximity',
-  'dispositivi vicini': 'navigate_proximity',
-  'sblocca telefono': 'navigate_proximity',
-  'vai a imagine': 'navigate_imagine',
-  'vai alla generazione immagini': 'navigate_imagine',
-  'apri imagine': 'navigate_imagine',
-  'genera immagine': 'navigate_imagine',
-
-  // System toggles
-  'attiva overclock': 'toggle_overclock',
-  'disattiva overclock': 'toggle_overclock',
-  'overclock': 'toggle_overclock',
-  'attiva suoni': 'toggle_sound',
-  'disattiva suoni': 'toggle_sound',
-  'attiva effetti sonori': 'toggle_sound',
-  'disattiva effetti sonori': 'toggle_sound',
-  'attiva scanlines': 'toggle_scanlines',
-  'disattiva scanlines': 'toggle_scanlines',
-
-  // Voice
-  'attiva wake word': 'toggle_wake',
-  'disattiva wake word': 'toggle_wake',
-  'attiva comando vocale': 'toggle_wake',
-  'disattiva comando vocale': 'toggle_wake',
-  'attiva conversazione continua': 'toggle_continuous',
-  'disattiva conversazione continua': 'toggle_continuous',
-  'attiva auto speak': 'toggle_autospeak',
-  'disattiva auto speak': 'toggle_autospeak',
-
-  // Globe
-  'attiva rotazione globo': 'toggle_globe_rotate',
-  'disattiva rotazione globo': 'toggle_globe_rotate',
-  'vista globale': 'globe_global_view',
-  'mostra vista globale': 'globe_global_view',
-  'attiva gesti globo': 'toggle_globe_gestures',
-  'disattiva gesti globo': 'toggle_globe_gestures',
-
-  // Particles
-  'attiva rotazione particelle': 'toggle_particles_rotate',
-  'disattiva rotazione particelle': 'toggle_particles_rotate',
-  'attiva gesti particelle': 'toggle_particles_gestures',
-  'disattiva gesti particelle': 'toggle_particles_gestures',
-
-  // Terminal
-  'pulisci terminale': 'terminal_clear',
-  'cancella terminale': 'terminal_clear',
-  'termina processo': 'terminal_kill',
-  'kill': 'terminal_kill',
-  'aggiorna file': 'fb_refresh',
-  'ricarica file': 'fb_refresh',
-  'torna indietro': 'fb_back',
-  'vai avanti': 'fb_forward',
-  'sali directory': 'fb_up',
-  'directory superiore': 'fb_up',
-
-  // Knowledge base
-  'indicizza directory': 'kb_index',
-  'scansiona directory': 'kb_index',
-  'aggiungi documenti': 'kb_index',
-
-  // YouTube
-  'vai su youtube': 'navigate_youtube',
-  'apri youtube': 'navigate_youtube',
-  'vai al controllo youtube': 'navigate_youtube',
-
-  // Memory
-  'scansiona progetti': 'memory_scan_projects',
-
-  // Logs
-  'apri log': 'open_logs',
-  'mostra log': 'open_logs',
-  'apri system log': 'open_logs',
-};
-
-function detectAndExecuteAction(query) {
-  const lower = query.toLowerCase().trim();
-  for (const [keyword, actionId] of Object.entries(ACTION_KEYWORDS)) {
-    if (lower === keyword || lower.startsWith(keyword + ' ') || lower.startsWith(keyword + '.') || lower.startsWith(keyword + ',')) {
-      addTickerEvent('agent', `Command recognized: "${keyword}" → ${actionId}`);
-      return executeAction(actionId);
-    }
-  }
-  return false;
-}
+// Flag condivisi per evitare doppio saluto vocale tra benvenuto AI e saluto locale
+window.__saviaWelcomeFirstSentence = false; // true quando il primo token del benvenuto AI è arrivato
+window.__saviaLocalGreetingSpoken = false;  // true quando il saluto locale è stato pronunciato
 
 const ollamaStatusDot = document.getElementById('ollama-status-dot');
 const ollamaStatusText = document.getElementById('ollama-status-text');
@@ -330,26 +169,43 @@ let lastBridgeState = null;
 
 async function checkOllamaBridge() {
   const startTime = Date.now();
+  const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
+  const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
+  const endpointDesc = isOpenRouter ? 'OpenRouter (openrouter.ai)' : (isOpenCode ? 'OpenCode Zen (opencode.ai)' : OLLAMA_HOST);
+  const providerName = isOpenRouter ? 'OpenRouter' : (isOpenCode ? 'OpenCode' : 'Ollama');
   try {
-    const res = await fetch(`${OLLAMA_HOST}/api/tags`, { method: 'GET' });
+    let res;
+    if (isOpenRouter) {
+      res = await fetch(`${openrouterBaseUrl}/auth/key`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
+      });
+    } else if (isOpenCode) {
+      res = await fetch(`${opencodeBaseUrl}/models`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${opencodeApiKey}` }
+      });
+    } else {
+      res = await fetch(`${OLLAMA_HOST}/api/tags`, { method: 'GET' });
+    }
     if (res.ok) {
       const duration = Date.now() - startTime;
       const wasOffline = !ollamaOnline;
       ollamaOnline = true;
       if (wasOffline && lastBridgeState === false && typeof sendNotification === 'function') {
-        sendNotification('Cognitive bridge ONLINE. AI Agents ready.', 'success', 3000);
+        sendNotification(`Cognitive bridge ONLINE. Motore AI (${providerName}) pronto.`, 'success', 3000);
       }
-      systemBridgeStatus.textContent = 'COGNITIVE BRIDGE // ONLINE';
+      systemBridgeStatus.textContent = `COGNITIVE BRIDGE // ${providerName.toUpperCase()} ONLINE`;
       systemBridgeStatus.style.color = 'var(--accent-cyan)';
       systemBridgeStatus.style.textShadow = '0 0 10px var(--accent-cyan-glow)';
 
       if (ollamaStatusDot) ollamaStatusDot.className = 'item-status online';
-      if (ollamaStatusText) ollamaStatusText.textContent = 'status: active';
+      if (ollamaStatusText) ollamaStatusText.textContent = `status: ${providerName.toLowerCase()} active`;
 
       if (svcCognitive) {
         setServiceStatus(svcCognitive, 'online');
         const desc = svcCognitive.querySelector('.item-desc');
-        if (desc) { desc.textContent = `Mistral Active // ${duration}ms`; desc.style.color = 'var(--accent-cyan)'; }
+        if (desc) { desc.textContent = `${activeModel} Active // ${duration}ms`; desc.style.color = 'var(--accent-cyan)'; }
       }
 
       fillPing.style.width = `${Math.min(100, Math.max(5, Math.round(duration / 2)))}%`;
@@ -357,8 +213,8 @@ async function checkOllamaBridge() {
 
       const initLog = document.getElementById('initialization-log');
       if (initLog && initLog.textContent.includes('Verifying')) {
-        initLog.textContent = `Cognitive bridge established on ${OLLAMA_HOST}. Mistral synaptic pathways locked and operational.`;
-        addTickerEvent('ollama', `Mistral model hooked to interface.`);
+        initLog.textContent = `Cognitive bridge established on ${endpointDesc}. ${activeModel} synaptic pathways locked and operational.`;
+        addTickerEvent('agent', `${activeModel} collegato via ${providerName}.`);
       }
 
       if (!welcomeSent) sendWelcomeMessage();
@@ -366,15 +222,15 @@ async function checkOllamaBridge() {
       lastBridgeState = true;
 
       if (Math.random() > 0.8) {
-        addTickerEvent('ollama', `Bridge ping verified. Latency: ${duration} ms.`);
+        addTickerEvent('agent', `Bridge ping verified (${providerName}). Latency: ${duration} ms.`);
       }
     } else {
-      throw new Error('Bridge responded with bad status');
+      throw new Error(`Bridge responded with status ${res.status}`);
     }
   } catch (error) {
     ollamaOnline = false;
     if (lastBridgeState !== false) {
-      if (typeof sendNotification === 'function') sendNotification('Cognitive bridge OFFLINE. Ollama unreachable.', 'error', 8000);
+      if (typeof sendNotification === 'function') sendNotification(`Cognitive bridge OFFLINE. ${providerName} non raggiungibile.`, 'error', 8000);
     }
     systemBridgeStatus.textContent = 'COGNITIVE BRIDGE // UNSTABLE';
     systemBridgeStatus.style.color = 'var(--accent-red)';
@@ -386,7 +242,7 @@ async function checkOllamaBridge() {
     if (svcCognitive) {
       setServiceStatus(svcCognitive, 'offline');
       const desc = svcCognitive.querySelector('.item-desc');
-      if (desc) { desc.textContent = 'Mistral OFFLINE'; desc.style.color = 'var(--accent-red)'; }
+      if (desc) { desc.textContent = `${providerName} OFFLINE`; desc.style.color = 'var(--accent-red)'; }
     }
 
     fillPing.style.width = '0%';
@@ -396,8 +252,8 @@ async function checkOllamaBridge() {
 
     const initLog = document.getElementById('initialization-log');
     if (initLog && initLog.textContent.includes('Verifying')) {
-      initLog.innerHTML = `Cognitive bridge <span style="color: var(--accent-red); font-weight: bold;">OFFLINE</span>. Ollama unreachable on ${OLLAMA_HOST}. AI commands will use local simulators.`;
-      addTickerEvent('warn', `Cognitive bridge connection failed on ${OLLAMA_HOST}.`);
+      initLog.innerHTML = `Cognitive bridge <span style="color: var(--accent-red); font-weight: bold;">OFFLINE</span>. ${providerName} non raggiungibile su ${endpointDesc}. I comandi AI useranno i simulatori locali.`;
+      addTickerEvent('warn', `Cognitive bridge connection failed on ${endpointDesc}.`);
     }
   }
 }
@@ -406,18 +262,172 @@ async function checkOllamaBridge() {
 setTimeout(checkOllamaBridge, 200);
 setInterval(checkOllamaBridge, 8000);
 
+// Benvenuto immediato: parte subito all'avvio, senza aspettare il primo ping
+// del ponte. Se Ollama è lento o offline, scatta il saluto locale (vedi sotto).
+if (!welcomeSent) setTimeout(() => { sendWelcomeMessage(); }, 100);
+
 // Carica config persistita + popola il selettore modelli all'avvio
 loadRuntimeConfig().then(() => {
   refreshModelList();
   applyModelToUI();
 });
 
+// Funzione unificata per streaming chat (OpenRouter / OpenCode Zen SSE / Ollama JSON lines)
+async function streamAiChatCompletion({ messages, onToken, signal }) {
+  const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
+  const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
+
+  if (isOpenRouter || isOpenCode) {
+    const url = isOpenRouter ? `${openrouterBaseUrl}/chat/completions` : `${opencodeBaseUrl}/chat/completions`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${isOpenRouter ? openrouterApiKey : opencodeApiKey}`
+    };
+    if (isOpenRouter) {
+      headers['HTTP-Referer'] = 'https://github.com/savia';
+      headers['X-Title'] = 'S.A.V.I.A';
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: getActiveModel(),
+        messages,
+        stream: true
+      }),
+      signal
+    });
+
+    if (!response.ok) {
+      let errText = '';
+      try {
+        const errJson = await response.json();
+        if (errJson.error && errJson.error.message) {
+          errText = errJson.error.message;
+        } else if (errJson.message) {
+          errText = errJson.message;
+        } else {
+          errText = JSON.stringify(errJson);
+        }
+      } catch {
+        errText = await response.text();
+      }
+
+      if (isOpenCode && response.status === 401 && (errText.includes('payment method') || errText.includes('CreditsError'))) {
+        throw new Error(`OpenCode Zen: Nessun metodo di pagamento associato al workspace. Aggiungi crediti o un metodo di pagamento su https://opencode.ai/workspace/wrk_01M1BPS5DBX6H5ZHGR2YPPMCFP/billing`);
+      }
+      throw new Error(`${isOpenRouter ? 'OpenRouter' : 'OpenCode'} API error (${response.status}): ${errText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    streamActive = true;
+
+    try {
+      while (true) {
+        await waitIfStandby();
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+          if (trimmed === 'data: [DONE]') continue;
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const jsonChunk = JSON.parse(trimmed.slice(6));
+              const delta = jsonChunk.choices?.[0]?.delta?.content;
+              if (delta) {
+                onToken(delta);
+              }
+            } catch (jsonErr) {
+              console.warn('SSE parse error:', jsonErr);
+            }
+          }
+        }
+      }
+
+      if (buffer.trim() && buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
+        try {
+          const jsonChunk = JSON.parse(buffer.trim().slice(6));
+          const delta = jsonChunk.choices?.[0]?.delta?.content;
+          if (delta) onToken(delta);
+        } catch (e) {}
+      }
+    } finally {
+      streamActive = false;
+    }
+
+  } else {
+    // Ollama streaming
+    const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: getActiveModel(),
+        messages,
+        stream: true
+      }),
+      signal
+    });
+
+    if (!response.ok) throw new Error('Model streaming connection failure');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    streamActive = true;
+
+    try {
+      while (true) {
+        await waitIfStandby();
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const jsonChunk = JSON.parse(line);
+            if (jsonChunk.message && jsonChunk.message.content) {
+              onToken(jsonChunk.message.content);
+            }
+          } catch (jsonErr) {
+            console.error('Buffer parse breakdown:', jsonErr);
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        try {
+          const jsonChunk = JSON.parse(buffer);
+          if (jsonChunk.message && jsonChunk.message.content) {
+            onToken(jsonChunk.message.content);
+          }
+        } catch(e) {}
+      }
+    } finally {
+      streamActive = false;
+    }
+  }
+}
+
 async function sendWelcomeMessage() {
   welcomeSent = true; sessionStorage.setItem('savia-welcome-sent', 'true');
 
-  // Wait for memory to be loaded if the promise exists
+  // Attesa memoria con timeout: il benvenuto non deve mai bloccarsi in attesa.
   if (window.memoryLoadedPromise) {
-    await window.memoryLoadedPromise;
+    const memTimeout = new Promise(resolve => setTimeout(resolve, 1500));
+    await Promise.race([window.memoryLoadedPromise.catch(() => null), memTimeout]);
   }
 
   const systemContent = getAgentPrompt();
@@ -427,57 +437,36 @@ async function sendWelcomeMessage() {
     ? 'Your optical and neural systems have just reactivated. Generate a short welcome back greeting for your creator. You perfectly remember our previous conversations (present in long-term memory above). Be informal, compliant, and in a cyberpunk style, avoiding mechanical summaries.'
     : 'Your optical and neural systems have just activated for the first time. Generate a welcome greeting for your creator. Be cyberpunk but natural.') + '\n\nGreet the user according to the time of day in the style of JARVIS from Iron Man (e.g. "Good morning sir" in the morning, "Good evening sir" in the evening). Reply to the user in the language they used.';
 
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let firstTokenTimer = null;
+
   try {
-    const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: getActiveModel(),
-        messages: [
-          { role: 'system', content: systemContent },
-          ...history,
-          { role: 'user', content: welcomePrompt }
-        ],
-        stream: true
-      })
-    });
-
-    if (!response.ok) return;
-
     const streamTextRef = appendLogMessage('savia', '', 'ai');
+    let spokenCursor = 0;
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const jsonChunk = JSON.parse(line);
-          if (jsonChunk.message && jsonChunk.message.content) {
-            streamTextRef.textContent += jsonChunk.message.content;
-            terminalLogs.scrollTop = terminalLogs.scrollHeight;
-          }
-        } catch (jsonErr) {}
-      }
+    if (controller) {
+      firstTokenTimer = setTimeout(() => { try { controller.abort(); } catch (e) {} }, 12000);
     }
 
-    if (buffer.trim()) {
-      try {
-        const jsonChunk = JSON.parse(buffer);
-        if (jsonChunk.message && jsonChunk.message.content) {
-          streamTextRef.textContent += jsonChunk.message.content;
+    await streamAiChatCompletion({
+      messages: [
+        { role: 'system', content: systemContent },
+        ...history,
+        { role: 'user', content: welcomePrompt }
+      ],
+      signal: controller ? controller.signal : undefined,
+      onToken: (token) => {
+        streamTextRef.textContent += token;
+        terminalLogs.scrollTop = terminalLogs.scrollHeight;
+        if (!window.__saviaWelcomeFirstSentence) {
+          window.__saviaWelcomeFirstSentence = true;
+          if (firstTokenTimer) { clearTimeout(firstTokenTimer); firstTokenTimer = null; }
         }
-      } catch(e) {}
-    }
+        if (!window.__saviaLocalGreetingSpoken) {
+          spokenCursor = speakStreamedSentences(streamTextRef.textContent, spokenCursor);
+        }
+      }
+    });
 
     const fullResponse = streamTextRef.textContent.trim();
     if (!fullResponse) return;
@@ -486,14 +475,24 @@ async function sendWelcomeMessage() {
     cleanedText = cleanedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     streamTextRef.innerHTML = cleanedText;
 
-    if (autoSpeak) speakText(streamTextRef.textContent);
+    // Pronuncia l'eventuale coda residua non ancora letta durante lo stream.
+    if (!window.__saviaLocalGreetingSpoken) {
+      const remaining = streamTextRef.textContent.slice(spokenCursor);
+      if (remaining.trim()) queueSpeak(remaining);
+    }
+
     playAudio(audioClick);
-    addTickerEvent('agent', `S.A.V.I.A online. Welcome generated.`);
+    addTickerEvent('agent', `S.A.V.I.A online. Benvenuto generato.`);
     document.dispatchEvent(new CustomEvent('savia-response-complete', {
       detail: { query: '', response: streamTextRef.textContent }
     }));
   } catch (e) {
     welcomeSent = false; sessionStorage.setItem('savia-welcome-sent', 'false');
+    streamActive = false;
+    // Fallback: saluto locale immediato con voce, così non resta mai muto né bloccato.
+    if (typeof window.__saviaBootGreeting === 'function') window.__saviaBootGreeting();
+  } finally {
+    if (firstTokenTimer) clearTimeout(firstTokenTimer);
   }
 }
 
@@ -521,17 +520,35 @@ function buildConversationHistory(maxPairs = 4) {
 terminalForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const query = terminalInput.value.trim();
+  const sourcePage = e.detail && e.detail.sourcePage;
   if (!query) return;
 
+  // Fast path STAND BY: interrompe prima di fermare la sintesi corrente,
+  // così "pausa"/"ricomincia" agiscono sull'azione in corso.
+  if (handleStandbyCommand(query)) {
+    appendLogMessage('user', query, 'user');
+    terminalInput.value = '';
+    playAudio(audioClick);
+    document.dispatchEvent(new Event('savia-standby-command'));
+    return;
+  }
+
+  resetStandby();
   stopSpeaking();
 
   playAudio(audioClick);
 
-  appendLogMessage('user', query, 'user');
+  const isVoice = (e.detail && e.detail.isVoice);
+  appendLogMessage('user', isVoice ? `[VOCE] ${query}` : query, 'user');
   terminalInput.value = '';
 
   // Fast path: if query is an action command, execute and skip AI
-  if (detectAndExecuteAction(query)) return;
+  if (detectAndExecuteAction(query, sourcePage)) {
+    document.dispatchEvent(new CustomEvent('savia-response-complete', {
+      detail: { query, response: null }
+    }));
+    return;
+  }
 
   typingIndicator.classList.remove('hidden');
   terminalLogs.scrollTop = terminalLogs.scrollHeight;
@@ -565,18 +582,6 @@ terminalForm.addEventListener('submit', async (e) => {
         { role: 'user', content: query + '\n\nReply to the user in the language they used in their query.' }
       ];
 
-      const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: getActiveModel(),
-          messages,
-          stream: true
-        })
-      });
-
-      if (!response.ok) throw new Error('Model streaming connection failure');
-
       typingIndicator.classList.add('hidden');
 
       const streamTextRef = appendLogMessage('savia', '', 'ai');
@@ -586,40 +591,17 @@ terminalForm.addEventListener('submit', async (e) => {
       agentBadge.style.color = agent ? agent.color : 'var(--accent-cyan)';
       streamTextRef.parentNode.insertBefore(agentBadge, streamTextRef);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      let spokenCursor = 0;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const jsonChunk = JSON.parse(line);
-            if (jsonChunk.message && jsonChunk.message.content) {
-              streamTextRef.textContent += jsonChunk.message.content;
-              terminalLogs.scrollTop = terminalLogs.scrollHeight;
-            }
-          } catch (jsonErr) {
-            console.error('Buffer parse breakdown:', jsonErr);
-          }
+      await streamAiChatCompletion({
+        messages,
+        onToken: (token) => {
+          streamTextRef.textContent += token;
+          terminalLogs.scrollTop = terminalLogs.scrollHeight;
+          // La voce parte mentre la risposta è ancora in generazione.
+          spokenCursor = speakStreamedSentences(streamTextRef.textContent, spokenCursor);
         }
-      }
-
-      if (buffer.trim()) {
-        try {
-          const jsonChunk = JSON.parse(buffer);
-          if (jsonChunk.message && jsonChunk.message.content) {
-            streamTextRef.textContent += jsonChunk.message.content;
-          }
-        } catch(e) {}
-      }
+      });
 
       let fullResponse = streamTextRef.textContent.trim();
 
@@ -633,7 +615,7 @@ terminalForm.addEventListener('submit', async (e) => {
       // Execute [ACTION:...] tags from AI response
       const actionMatches = fullResponse.matchAll(/\[ACTION:(\w+)\]/gi);
       for (const match of actionMatches) {
-        executeAction(match[1]);
+        executeConfigAction(match[1]);
       }
 
       // Clean [TOOL], [ACTION] directives and Llama3 tokens from displayed response
@@ -643,7 +625,9 @@ terminalForm.addEventListener('submit', async (e) => {
       fullResponse = streamTextRef.textContent;
 
       if (autoSpeak && fullResponse) {
-        speakText(fullResponse);
+        // Pronuncia solo la coda residua non ancora letta durante lo stream
+        const remaining = streamTextRef.textContent.slice(spokenCursor);
+        if (remaining.trim()) queueSpeak(remaining);
       }
 
       if (typeof logConversation === 'function' && query && fullResponse) {
@@ -658,6 +642,7 @@ terminalForm.addEventListener('submit', async (e) => {
 
     } catch (streamError) {
       typingIndicator.classList.add('hidden');
+      streamActive = false;
       playAudio(audioBeep);
       appendLogMessage('sys_err', `COGNITIVE STREAM INTERRUPTED: Connection error during active synthesis. Details: ${streamError.message}`, 'error');
     }
@@ -683,21 +668,26 @@ terminalForm.addEventListener('submit', async (e) => {
 // ============================================================
 // VOICE OUTPUT (ElevenLabs + Web Speech API fallback)
 // ============================================================
-var ELEVENLABS_API_KEY = ''; // caricata da savia-config.json via IPC
+var ELEVENLABS_API_KEY = localStorage.getItem('elevenlabs-key') || '';
 var elevenLabsVoiceId = localStorage.getItem('elevenlabs-voice-id') || '';
 var elevenLabsVoices = [];
-var useElevenLabs = localStorage.getItem('use-elevenlabs') !== 'false';
+var useElevenLabs = localStorage.getItem('use-elevenlabs') === 'true'; // false per default se non configurato
 
 let autoSpeak = localStorage.getItem('auto-speak') !== 'false';
 let synth = window.speechSynthesis;
 let autoSpeakBtn = document.getElementById('btn-auto-speak');
 let elevenLabsBtn = document.getElementById('btn-elevenlabs');
-let wsVoice = null; // auto-selected Italian voice for Web Speech fallback
+let wsVoice = null; // voce selezionata per sintesi locale JARVIS
 
 function selectItalianVoice() {
   if (!synth) return;
   var v = synth.getVoices();
-  wsVoice = v.find(function(v) { return v.lang.startsWith('it'); }) || v[0] || null;
+  if (!v || !v.length) return;
+  // Priorità: voce naturale italiana profonda e chiara (es. Cosimo / Elsa / Natural / Google)
+  wsVoice = v.find(function(item) { return item.lang === 'it-IT' && (/cosimo|natural|google|male/i.test(item.name)); })
+    || v.find(function(item) { return item.lang && item.lang.startsWith('it'); })
+    || v.find(function(item) { return item.lang && item.lang.startsWith('en'); })
+    || v[0] || null;
 }
 
 if (synth) {
@@ -709,11 +699,160 @@ if (synth) {
 
 let ttsAudioEl = null;
 
+// ============================================================
+// STAND BY — pausa/ripresa dell'azione in corso (TTS + stream)
+// Riprende esattamente da dove era rimasto.
+// ============================================================
+let standbyActive = false;
+let standbyResumeResolve = null;
+let streamActive = false;
+
+function waitIfStandby() {
+  if (!standbyActive) return Promise.resolve();
+  return new Promise(function (resolve) { standbyResumeResolve = resolve; });
+}
+
+function isActionRunning() {
+  return !!((synth && (synth.speaking || synth.pending)) || ttsAudioEl || streamActive || ttsQueueBusy || ttsQueue.length > 0 || (typeof voiceAudioInProgress !== 'undefined' && voiceAudioInProgress));
+}
+
+window.saviaIsSpeaking = isActionRunning;
+
+function updateStandbyUI() {
+  const statusText = document.getElementById('agent-status-text');
+  if (statusText) {
+    statusText.textContent = standbyActive ? 'STAND BY — azione in pausa' : 'AUTO — Waiting for input';
+    statusText.style.color = standbyActive ? 'var(--accent-gold)' : '';
+  }
+  const dot = document.getElementById('agent-dot');
+  if (dot) dot.style.background = standbyActive ? 'var(--accent-gold)' : '';
+  updateStandbyBtn();
+}
+
+let standbyBtn = null;
+
+function updateStandbyBtn() {
+  if (!standbyBtn) standbyBtn = document.getElementById('btn-standby');
+  if (!standbyBtn) return;
+  standbyBtn.classList.toggle('active', standbyActive);
+  standbyBtn.innerHTML = standbyActive
+    ? '<span class="indicator"></span> RIPRENDI (RICOMINCIA)'
+    : '<span class="indicator"></span> STAND BY (PAUSA)';
+  const ind = standbyBtn.querySelector('.indicator');
+  if (ind) {
+    ind.style.background = standbyActive ? 'var(--accent-gold)' : '#555';
+    ind.style.boxShadow = standbyActive ? '0 0 6px var(--accent-gold)' : 'none';
+  }
+}
+
+function standbyPause() {
+  if (standbyActive) return { ok: false, reason: 'already' };
+  if (!isActionRunning()) return { ok: false, reason: 'none' };
+  standbyActive = true;
+  updateStandbyUI();
+  if (ttsAudioEl) { try { ttsAudioEl.pause(); } catch (e) {} }
+  if (synth && synth.speaking) { try { synth.pause(); } catch (e) {} }
+  addTickerEvent('sys', 'STAND BY — azione in pausa. Dite "ricomincia" per riprendere esattamente da dove era.');
+  if (typeof sendNotification === 'function') sendNotification('S.A.V.I.A in STAND BY. Dite "ricomincia".', 'info', 2500);
+  return { ok: true };
+}
+
+function standbyResume() {
+  if (!standbyActive) return { ok: false, reason: 'not-active' };
+  standbyActive = false;
+  if (ttsAudioEl) { try { ttsAudioEl.play().catch(function () {}); } catch (e) {} }
+  if (synth && synth.paused) { try { synth.resume(); } catch (e) {} }
+  if (standbyResumeResolve) {
+    const r = standbyResumeResolve;
+    standbyResumeResolve = null;
+    r();
+  }
+  updateStandbyUI();
+  addTickerEvent('sys', 'RIPRESA — si continua esattamente da dove era rimasto.');
+  if (typeof sendNotification === 'function') sendNotification('S.A.V.I.A ripreso.', 'success', 2000);
+  return { ok: true };
+}
+
+function parseStandbyCommand(query) {
+  const lower = query.toLowerCase().replace(/[.,!?]/g, ' ').replace(/\s+/g, ' ').trim();
+  const stopKws = ['stop', 'silenzio', 'basta', 'fermati', 'zitto', 'taci', 'interrompi', 'stai zitto', 'chiudi la bocca'];
+  for (const k of stopKws) if (lower === k || lower.startsWith(k + ' ')) return 'stop';
+  const pauseKws = ['mettiti in pausa', 'mettimi in pausa', 'metti in pausa', 'in pausa', 'mettere in pausa', 'pausa', 'standby', 'stand by', 'attiva standby', 'stai in stand by'];
+  const resumeKws = ['ricomincia', 'riprendi', 'riparti', 'riprendiamo', 'togli lo standby', 'togli standby', 'disattiva standby', 'riprendi a parlare', 'continua a parlare', 'riprendi la risposta', 'continua la risposta', 'continua da dove', 'riprendi da dove'];
+  for (const k of pauseKws) if (lower === k || lower.startsWith(k + ' ')) return 'pause';
+  for (const k of resumeKws) if (lower === k || lower.startsWith(k + ' ')) return 'resume';
+  return null;
+}
+
+function handleStandbyCommand(query) {
+  const cmd = parseStandbyCommand(query);
+  if (!cmd) return false;
+  if (cmd === 'stop') {
+    stopSpeaking();
+    addTickerEvent('sys', 'Interruzione vocale eseguita: sintesi arrestata.');
+    if (typeof sendNotification === 'function') sendNotification('S.A.V.I.A: Sintesi arrestata.', 'info', 1500);
+    return true;
+  }
+  if (cmd === 'pause') {
+    const r = standbyPause();
+    if (!r.ok) {
+      addTickerEvent(r.reason === 'already' ? 'sys' : 'warn',
+        r.reason === 'already'
+          ? 'Già in STAND BY. Dite "ricomincia".'
+          : 'Nessuna azione in corso da mettere in pausa.');
+    }
+  } else {
+    const r = standbyResume();
+    if (!r.ok && r.reason === 'not-active') {
+      addTickerEvent('sys', 'Nessuna azione in pausa da riprendere.');
+    }
+  }
+  return true;
+}
+
+window.saviaStandbyPause = standbyPause;
+window.saviaStandbyResume = standbyResume;
+
+function initStandbyButton() {
+  standbyBtn = document.getElementById('btn-standby');
+  updateStandbyBtn();
+  if (standbyBtn) {
+    standbyBtn.addEventListener('click', function () {
+      if (typeof playAudio === 'function') playAudio(audioClick);
+      const r = standbyActive ? standbyResume() : standbyPause();
+      if (!r.ok) {
+        addTickerEvent(r.reason === 'already' ? 'sys' : 'warn',
+          r.reason === 'already'
+            ? 'Già in STAND BY. Premi di nuovo per riprendere.'
+            : 'Nessuna azione in corso da mettere in pausa.');
+      }
+    });
+  }
+}
+initStandbyButton();
+
+function resetStandby() {
+  if (standbyActive) {
+    standbyActive = false;
+    if (synth && synth.paused) { try { synth.resume(); } catch (e) {} }
+    if (standbyResumeResolve) {
+      const r = standbyResumeResolve;
+      standbyResumeResolve = null;
+      r();
+    }
+    updateStandbyUI();
+  }
+  if (ttsAudioEl) { try { ttsAudioEl.pause(); } catch (e) {} }
+}
+
 function stopSpeaking() {
+  ttsQueue = [];
+  ttsQueueBusy = false;
   if (ttsAudioEl) { try { ttsAudioEl.pause(); } catch (e) {} }
   ttsAudioEl = null;
   if (synth) { try { synth.cancel(); } catch (e) {} }
   if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
+  document.dispatchEvent(new CustomEvent('savia-speech-ended'));
 }
 
 window.saviaStopSpeaking = stopSpeaking;
@@ -869,9 +1008,17 @@ async function elevenLabsSpeak(text) {
 }
 
 // ── Saluto contestuale basato sull'ora (stile JARVIS) ─────────────────
-// Chiamato al termine della boot sequence: se il ponte è offline,
-// mostra e pronuncia un saluto locale invece di restare muto.
+// Chiamato al termine della boot sequence o come fallback se il ponte è
+// offline o il benvenuto AI non riesce a partire. Garantisce un messaggio
+// e una voce immediati all'avvio, senza mai restare muti o bloccati.
+let bootGreetingDone = false;
+
 window.__saviaBootGreeting = function () {
+  // Se il benvenuto AI è già partito (primo token arrivato), lascia parlare lui.
+  if (bootGreetingDone || window.__saviaWelcomeFirstSentence) return;
+  bootGreetingDone = true;
+  window.__saviaLocalGreetingSpoken = true;
+
   const hour = new Date().getHours();
   let saluto;
   if (hour < 6) saluto = 'Buonanotte, sir. Tutti i sistemi sono in standby, ma sono a disposizione.';
@@ -881,100 +1028,154 @@ window.__saviaBootGreeting = function () {
 
   addTickerEvent('sys', 'Saluto contestuale generato.');
 
-  // Il saluto AI (più ricco) verrà generato da sendWelcomeMessage se il bridge è online;
-  // qui gestiamo solo il fallback vocale locale per la boot sequence.
-  if (!ollamaOnline && autoSpeak && typeof speakText === 'function') {
+  if (autoSpeak && typeof speakText === 'function') {
     speakText(saluto);
   }
-  if (!ollamaOnline) {
-    appendLogMessage('savia', saluto, 'ai');
-  }
+  appendLogMessage('savia', saluto, 'ai');
 };
 
-// ── Salvataggio chiave ElevenLabs da UI ───────────────────────────────
-const elevenLabsKeyInput = document.getElementById('elevenlabs-key-input');
-const saveKeyBtn = document.getElementById('btn-save-elevenlabs-key');
-
-function applyElevenLabsKeyToUI() {
-  if (elevenLabsKeyInput && ELEVENLABS_API_KEY) elevenLabsKeyInput.value = ELEVENLABS_API_KEY;
-}
-
-if (saveKeyBtn) {
-  saveKeyBtn.addEventListener('click', async () => {
-    const key = (elevenLabsKeyInput && elevenLabsKeyInput.value.trim()) || '';
-    ELEVENLABS_API_KEY = key;
-    if (window.electronAPI && window.electronAPI.configSet) {
-      try { await window.electronAPI.configSet({ elevenLabsKey: key }); } catch (e) { /* ignore */ }
-    }
-    if (key) {
-      localStorage.setItem('use-elevenlabs', 'true');
-      useElevenLabs = true;
-      updateElevenLabsUI();
-      fetchElevenLabsVoices();
-      addTickerEvent('tts', 'ElevenLabs API key salvata. TTS premium attivo.');
-      sendNotification('ElevenLabs key salvata. TTS premium attivo.', 'success', 4000);
-    } else {
-      addTickerEvent('tts', 'Chiave ElevenLabs rimossa. Verrà usata la sintesi vocale di sistema.');
-    }
-  });
-}
-
-// Popola il campo chiave dalla config già caricata
-if (window.electronAPI && window.electronAPI.configGet) {
-  window.electronAPI.configGet().then((cfg) => {
-    if (cfg && cfg.elevenLabsKey && !elevenLabsKeyInput.value) {
-      ELEVENLABS_API_KEY = cfg.elevenLabsKey;
-      applyElevenLabsKeyToUI();
-      updateElevenLabsUI();
-      if (useElevenLabs && elevenLabsVoices.length === 0) fetchElevenLabsVoices();
-    }
-  }).catch(() => {});
+// Fetch voices on startup since key is hardcoded
+if (useElevenLabs && ELEVENLABS_API_KEY) {
+  setTimeout(() => fetchElevenLabsVoices(), 1000);
 }
 
 async function speakText(text) {
-  if (!text) return;
+  if (!text) return false;
   var cleanText = text.replace(/<[^>]*>/g, '').trim();
-  if (!cleanText) return;
+  if (!cleanText) return false;
 
   if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = true;
   addTickerEvent('agent', 'Voice synthesis in progress...');
 
-  // Try ElevenLabs first if enabled
-  if (useElevenLabs) {
+  // Try ElevenLabs only if explicitly enabled and key configured
+  if (useElevenLabs && ELEVENLABS_API_KEY && !ELEVENLABS_API_KEY.startsWith('sk_2141')) {
     var ok = await elevenLabsSpeak(cleanText);
     if (ok) {
-      if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
-      return;
+      if (ttsQueue.length === 0 && !ttsQueueBusy) {
+        if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
+        document.dispatchEvent(new CustomEvent('savia-speech-ended'));
+      }
+      return true;
     }
   }
 
-  // Fallback: Web Speech API
+  // Fallback / Default: Web Speech API (zero latency)
   if (!synth) {
     if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
-    return;
+    return false;
   }
 
+  return new Promise(function(resolve) {
+    try {
+      var utter = new SpeechSynthesisUtterance(cleanText);
+      utter.lang = 'it-IT';
+      utter.rate = 1.05;
+      utter.pitch = 0.95;
+      utter.volume = 1.0;
+
+      if (!wsVoice) selectItalianVoice();
+      if (wsVoice) utter.voice = wsVoice;
+
+      utter.onend = function() {
+        if (ttsQueue.length === 0 && !ttsQueueBusy) {
+          if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
+          document.dispatchEvent(new CustomEvent('savia-speech-ended'));
+        }
+        resolve(true);
+      };
+      utter.onerror = function() {
+        if (ttsQueue.length === 0 && !ttsQueueBusy) {
+          if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
+          document.dispatchEvent(new CustomEvent('savia-speech-ended'));
+        }
+        resolve(false);
+      };
+
+      synth.speak(utter);
+    } catch (e) {
+      if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
+      addTickerEvent('warn', 'Voice synthesis failed: ' + e.message);
+      resolve(false);
+    }
+  });
+}
+
+// ============================================================
+// CODA TTS INCREMENTALE — la voce parte durante la generazione
+// Il testo in streaming viene letto frase per frase, senza aspettare
+// che il messaggio completo sia finito.
+// ============================================================
+let ttsQueue = [];
+let ttsQueueBusy = false;
+
+async function processTtsQueue() {
+  if (ttsQueueBusy) return;
+  ttsQueueBusy = true;
   try {
-    var utter = new SpeechSynthesisUtterance(cleanText);
-    utter.lang = 'it-IT';
-    utter.rate = 1.0;
-    utter.pitch = 1.0;
-    utter.volume = 1.0;
-
-    if (wsVoice) utter.voice = wsVoice;
-
-    utter.onend = function() {
+    while (ttsQueue.length) {
+      const chunk = ttsQueue.shift();
+      await speakText(chunk);
+    }
+  } finally {
+    ttsQueueBusy = false;
+    if (!synth || (!synth.speaking && !synth.pending)) {
       if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
-    };
-    utter.onerror = function() {
-      if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
-    };
-
-    synth.speak(utter);
-  } catch (e) {
-    if (typeof voiceAudioInProgress !== 'undefined') voiceAudioInProgress = false;
-    addTickerEvent('warn', 'Voice synthesis failed: ' + e.message);
+      document.dispatchEvent(new CustomEvent('savia-speech-ended'));
+    }
   }
+}
+
+function queueSpeak(text) {
+  if (!autoSpeak) return;
+  const clean = String(text || '').replace(/\[TOOL\].*/gi, '')
+    .replace(/\[ACTION:\w+\]/gi, '')
+    .replace(/<\|.*?\|>/g, '').trim();
+  if (!clean) return;
+  ttsQueue.push(clean);
+  processTtsQueue();
+}
+
+// Estrae le frasi complete (fino a . ! ? + spazio/fine) dal testo finora
+// generato e le accoda alla sintesi. Restituisce il nuovo cursore letto.
+function speakStreamedSentences(fullText, cursor) {
+  if (!autoSpeak) return cursor;
+  const rest = String(fullText || '').slice(cursor);
+  let boundary = -1;
+  for (let i = 0; i < rest.length; i++) {
+    const ch = rest[i];
+    if (ch === '.' || ch === '!' || ch === '?') {
+      const next = rest[i + 1];
+      if (next === undefined || next === ' ' || next === '\n' || next === '\r' || next === '\t') {
+        boundary = i + 1;
+      }
+    }
+  }
+  if (boundary <= 0) return cursor;
+  const sentence = rest.slice(0, boundary).trim();
+  if (sentence) queueSpeak(sentence);
+  return cursor + boundary;
+}
+
+// ============================================================
+// MCP TOOL DOCS — espone i tool MCP all'agente (window.MCP_TOOL_DOCS)
+// ============================================================
+function buildMcpToolDocs(tools) {
+  window.MCP_TOOL_DOCS = (tools || []).map(t =>
+    '- ' + t.serverName + '/' + t.name + ': ' + String(t.description || '').split('\n')[0].substring(0, 150)
+  ).join('\n');
+}
+
+async function refreshMcpToolDocs() {
+  if (!window.electronAPI || !window.electronAPI.mcpListTools) return;
+  try {
+    const res = await window.electronAPI.mcpListTools();
+    buildMcpToolDocs(res && res.tools);
+  } catch (e) { /* ignore */ }
+}
+
+refreshMcpToolDocs();
+if (window.electronAPI && window.electronAPI.onMcpEvent) {
+  window.electronAPI.onMcpEvent(() => refreshMcpToolDocs());
 }
 
 

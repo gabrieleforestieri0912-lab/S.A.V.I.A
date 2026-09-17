@@ -1,5 +1,7 @@
 # S.A.V.I.A — Cognitive HUD & AI Assistant
 
+**S.A.V.I.A** = **Smart Artificial Virtual Intelligence Assistant**
+
 **Versione:** 4.0.0
 **Runtime:** Electron 31 + Node.js
 **AI Engine:** Ollama (llama3, nomic-embed-text) — modello selezionabile
@@ -18,7 +20,8 @@
 7. [Flusso AI — Dalla domanda alla risposta](#7-flusso-ai)
 8. [Sistema Vocale](#8-sistema-vocale)
 9. [API Esterne](#9-api-esterne)
-10. [Dipendenza Zero](#10-dipendenza-zero)
+10. [Novità v4.0.0](#10-novità-v400)
+11. [Dipendenze](#11-dipendenze)
 
 ---
 
@@ -30,7 +33,8 @@
 │  main.js                                                         │
 │  ┌───────────────────────────────────────────────────────────┐   │
 │  │ Servizi: Telemetry, File System, Terminal, Memoria,       │   │
-│  │ System Ops, RAG Pipeline, Agenti (calendar/todo/reminder) │   │
+│  │ System Ops, RAG Pipeline, Agenti (calendar/todo/reminder), │   │
+│  │ Hotline, Proximity (BLE), MCP Servers                      │   │
 │  └───────────────────────────────────────────────────────────┘   │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ IPC (contextBridge)
@@ -66,23 +70,25 @@
 ```
 S.A.V.I.A/
 ├── package.json              # Metadati progetto, entry point Electron
-├── main.js                   # Processo principale Electron (1326 righe)
-├── preload.js                # Ponte IPC contextBridge (97 righe)
+├── main.js                   # Processo principale Electron (2236 righe)
+├── preload.js                # Ponte IPC contextBridge (187 righe)
 ├── savia.png                 # Icona dell'app
 │
 ├── src/
 │   ├── index.html            # HUD principale — Terminale Cognitivo + Dashboard
 │   ├── terminal.html         # Command Center — File Explorer + Terminale
 │   ├── youtube.html          # Ricerca e riproduzione YouTube
+│   ├── news.html             # News Feed Tech & AI + watchdog segnalazioni
 │   ├── particles.html        # Motore 3D particelle neurali
 │   ├── globe.html            # Mappa mondiale 3D con meteo
 │   ├── knowledge.html        # Knowledge Base RAG
+│   ├── mcp.html              # Hub server MCP (Model Context Protocol)
 │   │
 │   ├── style.css             # Foglio di stile cyberpunk HUD (2700+ righe)
 │   │
 │   ├── shared.js             # Utility condivise tra tutte le pagine
 │   ├── agents.js             # Router multi-agente e definizioni
-│   ├── ollama.js             # Ponte AI Ollama + chat + TTS
+│   ├── ollama.js             # Ponte AI Ollama + chat + TTS + STAND BY
 │   ├── telemetry.js          # Monitoraggio sistema in tempo reale
 │   ├── memory.js             # Memoria contestuale personale
 │   ├── system-ops.js         # Esecuzione comandi di sistema
@@ -91,7 +97,10 @@ S.A.V.I.A/
 │   ├── commander.js          # File browser + emulatore terminale
 │   ├── knowledge-base.js     # Interfaccia RAG
 │   ├── globe.js              # Visualizzazione 3D Terra
-│   └── particles.js          # Sistema particelle 3D
+│   ├── particles.js          # Sistema particelle 3D
+│   ├── mcp-servers.js        # Servizio MCP (main process) — client SDK
+│   ├── mcp.js                # Controller pagina MCP (renderer)
+│   └── news.js               # Feed notizie + watchdog Tech/AI (condiviso index/news)
 ```
 
 ---
@@ -116,6 +125,19 @@ Il processo principale Electron. Crea la finestra, gestisce i servizi di sistema
 | **Telemetry Estesa** | `get-extended-telemetry`, `get-process-list` | GPU, rete, dischi, processi (PowerShell WMI) |
 | **Agenti** | `agent-tool` | CRUD calendario, todo, reminder (JSON) |
 | **RAG** | `kb-index-file`, `kb-index-directory`, `kb-search`, `kb-list`, `kb-delete`, `kb-status` | Pipeline RAG completa |
+| **MCP Servers** | `mcp-status`, `mcp-save`, `mcp-remove`, `mcp-start`, `mcp-stop`, `mcp-list-tools`, `mcp-call-tool`, `mcp-event` (push) | Client MCP (stdio/SSE/HTTP) → tool esposti all'agente AI |
+
+### Servizio MCP (Model Context Protocol)
+
+`src/mcp-servers.js` è un servizio del main process costruito sull'SDK ufficiale `@modelcontextprotocol/sdk`. Gestisce la connessione a qualunque server MCP e ne espone i tool all'intero sistema:
+
+- **Trasporti supportati**: `stdio` (processo locale: `npx`, `node`, `python`...), `sse` (Server-Sent Events) e `streamable-http`.
+- **Discovery tool**: ogni server connesso espone la sua lista `tools/list`; i tool confluiscono in una lista piatta disponibile all'agente cognitivo (`listTools`).
+- **Chiamata tool**: `callTool` inoltra la richiesta al server e converte la risposta (testo, immagini, risorse) in testo leggibile per l'AI.
+- **Eventi**: `status` e `tools` vengono inoltrati a tutta la UI via `mcp-event` (push) — la cache `window.MCP_TOOL_DOCS` in `ollama.js` si aggiorna live.
+- **Config + autostart**: l'elenco server vive in `savia-config.json` (`mcpServers`); all'avvio di S.A.V.I.A vengono connessi automaticamente i server con `enabled: true`.
+- **Agent tool**: l'AI può chiamare qualunque tool MCP con `[TOOL] mcp:<serverId> <toolName> <json>` (vedi `parseAgentTools`).
+- **UI**: pagina `mcp.html` per aggiungere/modificare/rimuovere server, avviarli/fermarli e testarne i tool manualmente (JSON args + CALL).
 
 ### Pipeline RAG (Knowledge Base)
 
@@ -175,8 +197,22 @@ shared.js → agents.js → ollama.js → telemetry.js → memory.js
 ### `youtube.html` — YouTube Player
 
 - Ricerca video con filtri (ordine, durata, safeSearch)
-- Pannello dettagli con statistiche (view, like, commenti)
+- Pannello dettagli con statistiche (view, like, commenti) e azioni rapide (PLAYLIST, ISCRIVITI, ANALIZZA)
+- Tab **PLAYLIST**: playlist locali (crea/apri/elimina, aggiungi e rimuovi video dal dettaglio)
+- Tab **ISCRITTI**: iscrizioni locali ai canali (dedup, rimozione, apertura canale)
+- Tab **ANALISI**: report di performance del canale (iscritti, visualizzazioni, engagement, medie, top video, durata media)
+- **Comandi vocali / testo** dall'index (che attraversano le finestre via localStorage `yt-cmd`):
+  `cerca su youtube …`, `aggiungi alla playlist …`, `rimuovi dalla playlist …`, `iscriviti al canale …`, `analizza canale …`
 - Chiave API configurabile da interfaccia
+
+### `news.html` — News Feed Tech & AI
+
+- Feed unificato da **Hacker News** (Algolia), **DEV Community** e **Google News IT** (via proxy allorigins) — senza API key
+- Categorie **TUTTE / AI / TECH** (classificazione automatica del titolo), ricerca, selezione sorgenti
+- **Watchdog S.A.V.I.A**: nella finestra principale controlla le sorgenti ogni N minuti (configurabile); quando trova notizie nuove avvisa con notifica di sistema + toast + voce e logga le segnalazioni
+- Dedup tramite cursor in localStorage: le notizie già viste non vengono ripetute
+- Salvataggio locale "per dopo" delle notizie
+- Comandi vocali/testo dall'index: `apri le notizie`, `ultime notizie`, `vai alle notizie`…
 
 ### `particles.html` — Particelle Neurali
 
@@ -194,6 +230,12 @@ shared.js → agents.js → ollama.js → telemetry.js → memory.js
 
 - Lista documenti indicizzati con eliminazione
 - Ricerca semantica con punteggio di similarità (cosine similarity)
+
+### `mcp.html` — MCP Servers (Connect Any App)
+
+- Pannello sinistro: form AGGIUNGI/MODIFICA server (nome, trasporto, comando/URL, args, env/headers JSON, auto-connect) + lista server configurati con stato, pulsanti CONNETTI/STOP/MODIFICA/RIMUOVI + log MCP
+- Pannello destro: **TOOL DISCOVERED** — tutti i tool dei server connessi, descrizione e runner di test (args JSON + CALL) con output inline
+- Accessibile dal nav rail di tutte le pagine (`MCP_SERVERS`), dal comando vocale e dall'agent (`navigate_mcp`)
 
 ---
 
@@ -235,6 +277,7 @@ Definisce 4 agenti specializzati + routing automatico.
 - `[TOOL] todo:list|add|done` — gestione task
 - `[TOOL] reminder:set|...` — promemoria
 - `[TOOL] imagine:descrizione` — genera prompt immagini
+- `[TOOL] mcp:<serverId> <toolName> {json}` — chiama un tool di un server MCP connesso (server/args autodiscovery)
 
 ### `ollama.js` — Ponte AI
 
@@ -268,6 +311,14 @@ Auto-speak (ElevenLabs TTS) + log conversazione in memoria
 ```
 
 **Action Mappings:** L'AI può eseguire azioni UI scrivendo `[ACTION:nome]` nella risposta. Oltre 30 azioni mappate: navigazione pagine, toggle modalità, comandi terminale, controllo globe/particelle.
+
+**STAND BY (pausa/ripresa):** mentre una risposta viene generata o letta ad alta voce, S.A.V.I.A può essere messa in pausa e ripresa **esattamente dal punto in cui era rimasta**:
+- Comandi rapidi: **"mettiti in pausa" / "pausa" / "standby"** e **"ricomincia" / "riprendi" / "riparti"** — intercettati come fast-path *prima* di `stopSpeaking()`, per non cancellare la sintesi in corso.
+- **TTS in corso** → pausa/ripresa nativa (`synth.pause()/resume()` su Web Speech, `audio.pause()/play()` su ElevenLabs): la voce riprende dalla parola esatta.
+- **Stream Ollama in corso** → il loop di generazione si blocca su un gate (`waitIfStandby`) e riprende dal token successivo; `streamActive` viene azzerato nei `catch` e da `resetStandby()` quando arriva una nuova query.
+- **UI**: pulsante `STAND BY (PAUSA)` ⇄ `RIPRENDI (RICOMINCIA)` nel pannello VOICE INTERFACE, indicatore gold su `agent-status-text`/`agent-dot`, ticker + notifica.
+- **API**: `window.saviaStandbyPause()` / `window.saviaStandbyResume()`.
+- Stato vocale: il consumo di un comando standby emette `savia-standby-command`, che ripristina il riconoscimento vocale (evita di restare bloccati in `PROCESSING`).
 
 ### `telemetry.js` — Monitoraggio Sistema
 
@@ -384,6 +435,8 @@ IDLE → WAKE_LISTEN → "Hey SAVIA" → WAKE_HEARD
 
 ## 7. Flusso AI
 
+*Nota: prima ancora del routing, i comandi STAND BY (`pausa`/`ricomincia`) vengono intercettati come fast-path nel submit handler — gestiti in modo sincrono, senza passare dall'AI né fermare la sintesi in corso.*
+
 ```
           ┌───────────────┐
           │  Input utente  │  (testo o voce)
@@ -447,6 +500,9 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 - Se il wake word contiene già il comando, salta CAPTURING
 - Modalità continua: dopo TTS, riascolta immediatamente
 - TTS: ElevenLabs multilingua, voce persistente in localStorage
+- Un comando STAND BY consumato emette `savia-standby-command`, che riporta lo stato vocale a IDLE e riavvia l'ascolto (wake o continuo) senza rimanere bloccati in PROCESSING
+- **Power-on vocale**: quando la finestra è nascosta nella tray, chiamarla ("Hey SAVIA") la riapre e la porta in primo piano via IPC `window-reveal`; `backgroundThrottling: false` mantiene l'ascolto attivo anche a finestra nascosta
+- **STT locale (fallback Whisper)**: se lo Speech API cloud va in "retry" di rete (3 errori consecutivi) o non è disponibile, S.A.V.I.A passa automaticamente alla trascrizione locale (`src/stt-local.js`: mic + VAD → IPC → Whisper `Xenova/whisper-tiny` via transformers.js nel main process) — nessuna dipendenza dal cloud, riusa il pipeline STT della hotline (`call-server.transcribe`)
 ```
 
 ---
@@ -471,6 +527,7 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 
 - **Boot sequence JARVIS**: overlay di accensione con log di sistema scorrevoli, reattore animato e suono sintetizzato (WebAudio, nessuna risorsa esterna).
 - **Tray icon + hotkey globale**: S.A.V.I.A. vive nella system tray; `Ctrl+Alt+S` la mostra/nasconde da qualsiasi applicazione. Il pulsante di chiusura minimizza in tray invece di uscire.
+- **Avvio con Windows (tray)**: voce "Avvia con Windows" nel menu della tray (persistita in registro). All'avvio di Windows S.A.V.I.A parte direttamente in background (flag `--savia-hidden`, nessuna finestra all'apertura di sessione) con ascolto vocale e watchdog attivi: basta chiamarla con "Hey SAVIA" o usare `Ctrl+Alt+S`.
 - **Scheduler promemoria/calendario**: promemoria ed eventi salvati ora scattano davvero — notifica nativa Windows + toast in-app all'orario stabilito, anche a finestra nascosta.
 - **Controllo media**: `[CMD] media:play/pausa/next/prev/stop` per il controllo riproduzione (VK codes).
 - **Screenshot reale**: `[CMD] screenshot` cattura lo schermo e salva in `Pictures/SAVIA` (desktopCapturer).
@@ -480,7 +537,15 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 - **Config file**: `savia-config.json` (userData) per chiavi API e impostazioni — la chiave ElevenLabs non è più hardcoded nel codice.
 - **Saluto contestuale**: benvenuto JARVIS basato sull'ora del giorno (buongiorno/pomeriggio/sera) con fallback vocale locale.
 - **Pannello UPCOMING SCHEDULE nella Dashboard**: agenda unificata (eventi + promemoria + todo + obiettivi) con countdown live, alert acustico/visivo alla scadenza con toggle volume, azioni inline complete/elimina con animazioni di fade-out, beep di conferma e notifica `OBIETTIVO COMPLETATO` con conteggio progressi.
+- **MCP Servers (Connect Any App)**: connessione a qualunque app/agent tramite Model Context Protocol (stdio / SSE / HTTP) con l'SDK ufficiale. Pagina `mcp.html` per gestire i server e testare i tool; i tool MCP diventano utilizzabili dall'agente AI con `[TOOL] mcp:...` e dai comandi vocali.
+- **STAND BY**: pausa/ripresa dell'azione in corso (generazione streaming + TTS) esattamente dal punto in cui era rimasta — via chat ("pausa"/"ricomincia"), pulsante HUD o API `saviaStandbyPause/Resume`.
 
-## 11. Dipendenza Zero
+## 11. Dipendenze
 
-Il progetto ha **zero dipendenze runtime** in produzione. L'unico devDependency è `electron ^31.0.0`. Tutte le librerie esterne (Three.js, MediaPipe, Font Awesome) sono caricate via CDN direttamente dalle pagine HTML. Le API AI e di sistema sono chiamate HTTP dirette a servizi locali o remoti.
+Dipendenza principale in dev: `electron ^31.0.0`. Dipendenze runtime (pure JavaScript/node):
+- `@modelcontextprotocol/sdk` — client MCP (stdio/SSE/streamable-http) per il servizio `mcp-servers.js`
+- `@huggingface/transformers` + `onnxruntime-node` — STT locale (Whisper) per la Hotline
+- `ws` — WebSocket server per la Hotline (Twilio media stream)
+- `@vladmandic/face-api` — riconoscimento facciale (login/faccia)
+
+Le librerie di rendering (Three.js, MediaPipe, Font Awesome, Monaco) sono caricate via CDN dalle pagine HTML.

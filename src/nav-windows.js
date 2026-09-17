@@ -31,7 +31,7 @@
       var oc = el.getAttribute('onclick') || '';
       var m = oc.match(/window\.location\.href='([a-zA-Z0-9-]+\.html)'/);
       if (!m) continue;
-      var page = m[1];
+      let page = m[1];
       el.removeAttribute('onclick');
       el.onclick = function (ev) {
         if (ev) ev.preventDefault();

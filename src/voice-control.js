@@ -27,6 +27,7 @@ let wakeListening = false;
 let voiceAudioInProgress = false;
 let restartTimer = null;
 let commandTimeoutMs = 8000;
+let lastRecActivity = Date.now();
 
 // DOM refs
 const vcStatusDot = document.getElementById('vc-status-dot');
@@ -39,7 +40,13 @@ const chatVcLabel = document.getElementById('chat-vc-label');
 
 // Speach recognition API
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const voiceSupported = !!SR;
+const cloudSupported = !!SR;
+const micSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+const voiceSupported = cloudSupported || micSupported;
+
+// Fallback STT locale (Whisper) quando il cloud va in retry di rete
+let localMode = false;
+let cloudNetworkFailures = 0;
 
 // ── Wake word variants (Italian + English) ──────────────────────────
 const WAKE_WORDS = ['hey savia', 'ehi savia', 'savia', 's.a.v.i.a.', 'save ya'];
@@ -67,6 +74,93 @@ function extractCommand(text) {
     }
   }
   return text.trim();
+}
+
+// ============================================================
+// STT LOCALE (fallback Whisper) — sostituisce il cloud quando va in retry
+// ============================================================
+
+function localArmed() {
+  return localMode && !!window.LocalSTT && window.LocalSTT.supported();
+}
+
+function activateLocalVoice(reason) {
+  if (localMode) return;
+  localMode = true;
+  if (typeof addTickerEvent === 'function') {
+    if (reason) addTickerEvent('warn', reason);
+    addTickerEvent('sys', 'Riconoscimento vocale locale (Whisper) attivo.');
+  }
+  if (vcStatusText) vcStatusText.textContent = 'STT LOCALE...';
+  releaseRecognizer();
+  if (!wakeActive) return;
+  // Pre-carica il modello in background (per non perdere le prime chiamate),
+  // ma NON bloccarsi: il microfono ascolta subito e la trascrizione carica
+  // il modello lazy se serve. Riprova da sola in caso di errore di rete.
+  if (window.LocalSTT) {
+    window.LocalSTT.ensureModel().catch(() => {
+      if (typeof addTickerEvent === 'function') addTickerEvent('warn', 'Caricamento modello Whisper rinviato: verrà riprovato in background.');
+    });
+  }
+  startWakeListener();
+}
+
+function startLocalArm(mode) {
+  if (!localMode || !window.LocalSTT) return;
+  if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
+  if (wakeListening) return;
+  window.LocalSTT.start({
+    onUtterance: (text) => handleLocalUtterance(text),
+    onStatus: (s) => { if (vcStatusText && s) vcStatusText.textContent = s; }
+  }).then(() => {
+    wakeListening = true;
+    setVoiceState(mode === 'capture' ? VoiceState.CAPTURING : VoiceState.WAKE_LISTEN);
+  }).catch((err) => {
+    wakeListening = false;
+    const name = (err && err.name) || '';
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'NotFoundError') {
+      handleRecError({ error: 'not-allowed' });
+    } else {
+      scheduleWakeRestart(600);
+    }
+  });
+}
+
+function handleLocalUtterance(text) {
+  if (!text) { scheduleLocalRearm('wake'); return; }
+  if (voiceState === VoiceState.CAPTURING) {
+    processVoiceCommand(text);
+    return;
+  }
+  if (voiceState === VoiceState.WAKE_LISTEN) {
+    if (containsWakeWord(text)) {
+      setVoiceState(VoiceState.WAKE_HEARD);
+      if (window.electronAPI && typeof window.electronAPI.revealWindow === 'function') {
+        window.electronAPI.revealWindow();
+      }
+      const command = extractCommand(text);
+      if (command && command.length > 1) {
+        setTimeout(() => processVoiceCommand(command), 250);
+      } else {
+        setTimeout(() => scheduleLocalRearm('capture'), 250);
+      }
+    } else {
+      scheduleLocalRearm('wake');
+    }
+  } else {
+    scheduleLocalRearm('wake');
+  }
+}
+
+function scheduleLocalRearm(mode) {
+  if (!localArmed() || !wakeActive) return;
+  if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
+  setTimeout(() => {
+    if (!wakeActive) return;
+    if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
+    if (mode === 'capture') startCommandCapture();
+    else startWakeListener();
+  }, 300);
 }
 
 // ── State Machine ────────────────────────────────────────────────────
@@ -144,6 +238,7 @@ function releaseRecognizer() {
     try { recognizer.onend = null; recognizer.stop(); } catch(e) {}
     recognizer = null;
   }
+  if (window.LocalSTT) window.LocalSTT.stop();
   wakeListening = false;
 }
 
@@ -172,7 +267,11 @@ function handleRecError(err) {
     return;
   }
   if (code === 'network') {
-    addTickerEvent('warn', 'Servizio riconoscimento vocale: retry.');
+    cloudNetworkFailures++;
+    addTickerEvent('warn', 'Servizio riconoscimento vocale: retry (' + cloudNetworkFailures + ').');
+    if (window.LocalSTT && cloudNetworkFailures >= 3) {
+      activateLocalVoice('Il riconoscimento vocale cloud è in retry continuo — passaggio al motore locale Whisper.');
+    }
     return;
   }
   addTickerEvent('warn', 'Riconoscimento vocale: ' + (code || 'errore sconosciuto'));
@@ -185,6 +284,8 @@ function startWakeListener() {
   if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
   if (wakeListening) return;
 
+  if (localArmed()) { startLocalArm('wake'); return; }
+
   releaseRecognizer();
 
   const rec = createRecognizer({ continuous: true, interim: true });
@@ -194,12 +295,19 @@ function startWakeListener() {
 
   rec.onresult = (event) => {
     if (heardWake) return;
+    lastRecActivity = Date.now();
 
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const transcript = event.results[i][0].transcript;
       if (containsWakeWord(transcript)) {
         heardWake = true;
         setVoiceState(VoiceState.WAKE_HEARD);
+
+        // Power-on vocale: se la finestra è nascosta nella tray la riapriamo
+        // (no-op sicuro quando è già visibile).
+        if (window.electronAPI && typeof window.electronAPI.revealWindow === 'function') {
+          window.electronAPI.revealWindow();
+        }
 
         const command = extractCommand(transcript);
         const isFinal = event.results[i].isFinal;
@@ -221,6 +329,7 @@ function startWakeListener() {
   };
 
   rec.onerror = (err) => {
+    lastRecActivity = Date.now();
     wakeListening = false;
     recognizer = null;
     handleRecError(err);
@@ -228,6 +337,7 @@ function startWakeListener() {
   };
 
   rec.onend = () => {
+    lastRecActivity = Date.now();
     if (recognizer === rec) recognizer = null;
     wakeListening = false;
     if (wakeActive && !heardWake && voiceState === VoiceState.WAKE_LISTEN) {
@@ -237,6 +347,7 @@ function startWakeListener() {
 
   try {
     rec.start();
+    lastRecActivity = Date.now();
     setVoiceState(VoiceState.WAKE_LISTEN);
   } catch(e) {
     recognizer = null;
@@ -263,6 +374,8 @@ function scheduleWakeRestart(delay) {
 
 function startCommandCapture() {
   if (!voiceSupported || !wakeActive) return;
+
+  if (localArmed()) { startLocalArm('capture'); return; }
 
   releaseRecognizer();
 
@@ -330,9 +443,42 @@ function startCommandCapture() {
   }
 }
 
+// ── Terminal Voice Commands ──────────────────────────────────────────
+const TERMINAL_CMD_PATTERNS = [
+  { pattern: /^(?:esegui|run|avvia|launch|exec|execute)\s+(.+)/i, handler: (m) => ({ type: 'execute', command: m[1] }) },
+  { pattern: /^(?:nuovo tab|new tab|apri tab|open tab)/i, handler: () => ({ type: 'new-tab' }) },
+  { pattern: /^(?:chiudi tab|close tab)/i, handler: () => ({ type: 'close-tab' }) },
+  { pattern: /^(?:dividi orizzontale|split orizzontale|split horizontal)/i, handler: () => ({ type: 'split-h' }) },
+  { pattern: /^(?:dividi verticale|split verticale|split vertical)/i, handler: () => ({ type: 'split-v' }) },
+  { pattern: /^(?:tab successivo|next tab|tab dopo)/i, handler: () => ({ type: 'next-tab' }) },
+  { pattern: /^(?:tab precedente|previous tab|tab prima)/i, handler: () => ({ type: 'prev-tab' }) },
+  { pattern: /^(?:pannello successivo|next pane|prossimo pannello)/i, handler: () => ({ type: 'focus-next' }) },
+  { pattern: /^(?:pannello precedente|previous pane)/i, handler: () => ({ type: 'focus-prev' }) },
+  { pattern: /^(?:pannello sopra|pannello superiore|pane up|focus up|up)/i, handler: () => ({ type: 'focus-up' }) },
+  { pattern: /^(?:pannello sotto|pannello inferiore|pane down|focus down|down)/i, handler: () => ({ type: 'focus-down' }) },
+  { pattern: /^(?:ferma|stop|kill|interrompi|termina)\s*(processo|process|processo)?/i, handler: () => ({ type: 'kill' }) },
+  { pattern: /^(?:pulisci|clear|svuota)\s*(terminale|terminal|schermo|screen)?/i, handler: () => ({ type: 'clear' }) },
+  { pattern: /^(?:apri esplora|open explorer|apri cartella|open folder|apri directory)/i, handler: () => ({ type: 'open-explorer' }) },
+];
+
+function matchTerminalCommand(text) {
+  for (const { pattern, handler } of TERMINAL_CMD_PATTERNS) {
+    const match = text.match(pattern);
+    if (match) return handler(match);
+  }
+  return null;
+}
+
+function dispatchTerminalVoice(terminalAction) {
+  // Use IPC to send command cross-window to terminal.html
+  if (window.electronAPI && window.electronAPI.sendTerminalVoiceCommand) {
+    window.electronAPI.sendTerminalVoiceCommand(terminalAction);
+  }
+}
+
 // ── Process Command ─────────────────────────────────────────────────
 
-async function processVoiceCommand(command) {
+async function processVoiceCommand(command, sourcePage) {
   if (!command) {
     setVoiceState(VoiceState.IDLE);
     if (wakeActive) scheduleWakeRestart(200);
@@ -344,8 +490,25 @@ async function processVoiceCommand(command) {
 
   appendLogMessage('user', `[VOCE] ${command}`, 'user');
 
+  // Check if this is a terminal-specific command
+  const terminalAction = matchTerminalCommand(command);
+  if (terminalAction) {
+    addTickerEvent('sys', `[VOCE] Terminal command: ${terminalAction.type}`);
+
+    dispatchTerminalVoice(terminalAction);
+
+    // Notify user
+    if (typeof sendNotification === 'function') {
+      sendNotification(`Comando terminale: ${command}`, 'info', 3000);
+    }
+    setVoiceState(VoiceState.IDLE);
+    if (wakeActive) scheduleWakeRestart(200);
+    return;
+  }
+
+  // Default: send to AI chat terminal
   terminalInput.value = command;
-  terminalForm.dispatchEvent(new Event('submit'));
+  terminalForm.dispatchEvent(new CustomEvent('submit', { detail: { sourcePage } }));
 }
 
 // ── Response Handler ────────────────────────────────────────────────
@@ -369,6 +532,16 @@ document.addEventListener('savia-response-complete', (e) => {
     waitForAudioEnd().then(resumeAfterAudio);
   } else {
     resumeAfterAudio();
+  }
+});
+
+document.addEventListener('savia-standby-command', () => {
+  // Un comando STAND BY (pausa/ricomincia) è stato consumato dal fast-path:
+  // ripristina lo stato vocale, altrimenti resterebbe bloccato in PROCESSING.
+  setVoiceState(VoiceState.IDLE);
+  if (wakeActive) {
+    if (continuousMode) startCommandCapture();
+    else startWakeListener();
   }
 });
 
@@ -439,7 +612,20 @@ function updateWakeUI() {
 
 // ── Init ────────────────────────────────────────────────────────────
 
+let voiceControlInitialized = false;
+
 function initVoiceControl() {
+  if (voiceControlInitialized) {
+    // Re-init (da retryVoiceInit): riarma solo l'ascolto se è morto,
+    // senza toccare lo stato macchina già avviato.
+    if (wakeActive && !wakeListening &&
+        voiceState !== VoiceState.PROCESSING && voiceState !== VoiceState.SPEAKING) {
+      startWakeListener();
+    }
+    return;
+  }
+  voiceControlInitialized = true;
+
   if (!voiceSupported) {
     if (vcStatusText) vcStatusText.textContent = 'NON SUPPORTATO';
     if (vcWakeToggle) vcWakeToggle.disabled = true;
@@ -476,15 +662,40 @@ function initVoiceControl() {
 
   if (wakeActive) {
     setTimeout(() => {
-      startWakeListener();
-      updateWakeUI();
-      if (typeof addTickerEvent === 'function') {
-        addTickerEvent('sys', 'Controllo vocale attivo. Di\' "Hey SAVIA" o parla liberamente.');
+      if (!cloudSupported && micSupported) {
+        activateLocalVoice('Speech API cloud non disponibile — attivo riconoscimento locale Whisper.');
+      } else {
+        startWakeListener();
+        updateWakeUI();
+        if (typeof addTickerEvent === 'function') {
+          addTickerEvent('sys', 'Controllo vocale attivo. Di\' "Hey SAVIA" o parla liberamente.');
+        }
       }
     }, 4000);
   }
+
+  // Heartbeat: se il riconoscimento muore in silenzio (finestra nascosta in
+  // tray, speech service interrotto, modello locale che fallisce), viene
+  // riarmato automaticamente ogni 5 secondi.
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    if (!wakeActive) return;
+    if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING ||
+        voiceState === VoiceState.WAKE_HEARD || voiceState === VoiceState.CAPTURING) return;
+    // Riconoscimento cloud "bloccato" senza nessun evento per 25s → riavvia.
+    if (!localMode && wakeListening && Date.now() - lastRecActivity > 25000) {
+      releaseRecognizer();
+      startWakeListener();
+      if (typeof addTickerEvent === 'function') addTickerEvent('warn', 'Riconoscimento vocale bloccato — riavviato.');
+      return;
+    }
+    if (wakeListening) return;
+    startWakeListener();
+    if (typeof addTickerEvent === 'function') addTickerEvent('sys', 'Riconoscimento vocale riarmato dal heartbeat.');
+  }, 5000);
 }
 
+let heartbeatTimer = null;
 let voiceInitRetries = 0;
 
 function retryVoiceInit() {
@@ -502,4 +713,13 @@ function retryVoiceInit() {
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(initVoiceControl, 3000);
   setTimeout(retryVoiceInit, 5000);
+
+  // Cross-page voice commands: receive from other pages via IPC
+  if (window.electronAPI && window.electronAPI.onVoiceFromPage) {
+    window.electronAPI.onVoiceFromPage((payload) => {
+      if (!payload || !payload.command) return;
+      addTickerEvent('sys', `[VOCE-${payload.page || '?'}] Comando: "${payload.command}"`);
+      processVoiceCommand(payload.command, payload.page);
+    });
+  }
 });

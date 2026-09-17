@@ -2,6 +2,11 @@ let soundEnabled = true;
 let overclockEnabled = true;
 let scanlinesEnabled = true;
 let ollamaOnline = false;
+let aiProvider = 'openrouter'; // 'openrouter' | 'opencode' | 'ollama'
+let openrouterApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
+let openrouterBaseUrl = 'https://openrouter.ai/api/v1';
+let opencodeApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
+let opencodeBaseUrl = 'https://opencode.ai/zen/v1';
 let systemLogsBuffer = [];
 
 const audioClick = document.getElementById('audio-click');
@@ -408,11 +413,12 @@ const NAV_PAGES = {
   'globe.html':       { title: 'LINEA_TEMPORALE',    external: true },
   'knowledge.html':   { title: 'BASE_CONOSCENZA',    external: true },
   'youtube.html':     { title: 'CONTROLLO_YOUTUBE',  external: true },
+  'mcp.html':         { title: 'MCP_SERVERS',        external: true },
 };
 
 // True quando la pagina corrente vive in una finestra-strumento dedicata
 // (in tal caso "index.html" deve riportare al centro di comando, non cambiare vista)
-const IS_TOOL_WINDOW = /(?:terminal|calendar|objectives|imagine|particles|globe|knowledge|youtube|hotline|proximity|face-training)\.html$/.test(location.pathname);
+const IS_TOOL_WINDOW = /(?:terminal|calendar|objectives|imagine|particles|globe|knowledge|youtube|hotline|proximity|face-training|mcp)\.html$/.test(location.pathname);
 
 let navReady = false;
 let currentNavPage = null;
@@ -575,3 +581,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }, 50);
 });
+
+// ── Apertura scheda/finestra: attiva le animazioni (html.savia-open)
+// quando la finestra diventa visibile → l'entrata è visibile in ogni pagina.
+(function () {
+  function triggerOpenAnim() {
+    var root = document.documentElement;
+    root.classList.remove('savia-open');
+    void root.offsetWidth;
+    root.classList.add('savia-open');
+  }
+  function onVisible() {
+    if (document.visibilityState === 'visible') triggerOpenAnim();
+  }
+  document.addEventListener('visibilitychange', onVisible);
+  if (document.visibilityState === 'visible') {
+    if (document.readyState === 'complete') {
+      setTimeout(triggerOpenAnim, 60);
+    } else {
+      window.addEventListener('load', function () { setTimeout(triggerOpenAnim, 60); });
+    }
+  }
+})();
