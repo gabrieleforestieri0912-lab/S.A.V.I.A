@@ -821,7 +821,7 @@ function showYtToast(msg) {
 
 // ============================================================
 // BRIDGE COMANDI VOCALI / CROSS-WINDOW — consuma "yt-cmd"
-// Set da index.html (ollama.js) quando un comando voce/testo
+// Set da index.html (cognitive.js) quando un comando voce/testo
 // viene riconosciuto; qui arriva via storage event oppure alla
 // prima lettura al caricamento della pagina.
 // ============================================================

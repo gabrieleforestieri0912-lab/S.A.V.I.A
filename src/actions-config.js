@@ -1,7 +1,7 @@
 /**
  * S.A.V.I.A - Azioni & Comandi (ACTION_MAP / ACTION_KEYWORDS / dispatcher)
- * Caricato PRIMA di ollama.js in index.html. Espone le stesse globali
- * che ollama.js dichiarava (executeAction resta per compatibilità con
+ * Caricato PRIMA di cognitive.js in index.html. Espone le stesse globali
+ * che cognitive.js dichiarava (executeAction resta per compatibilità con
  * system-ops.js, che lo sovrascrive come da ordine di caricamento).
  */
 

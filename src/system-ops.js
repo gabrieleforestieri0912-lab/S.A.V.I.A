@@ -186,7 +186,7 @@ function parseAIResponse(text) {
   return commands.length > 0 ? commands : null;
 }
 
-// ── Command Dispatcher (called from ollama.js after response) ────────
+// ── Command Dispatcher (called from cognitive.js after response) ────────
 
 async function processSystemCommands(text) {
   const commands = parseAIResponse(text);

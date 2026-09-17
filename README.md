@@ -49,7 +49,7 @@
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────────┐   │
 │  │ Moduli Renderer:                                            │   │
-│  │ shared.js  agents.js  ollama.js  telemetry.js               │   │
+│  │ shared.js  agents.js  cognitive.js  telemetry.js            │   │
 │  │ memory.js  system-ops.js  voice-control.js                  │   │
 │  │ dashboard.js  commander.js  knowledge-base.js               │   │
 │  │ youtube.js  globe.js  particles.js                          │   │
@@ -61,7 +61,7 @@
 
 - **Richiesta/Risposta** (`ipcMain.handle` / `ipcRenderer.invoke`): per query e comandi che richiedono un risultato (listDirectory, kbSearch, systemOpenApp)
 - **Push in tempo reale** (`webContents.send` / `ipcRenderer.on`): telemetry (ogni 2s), eventi file system, output terminale
-- **Eventi DOM personalizzati**: `savia-response-complete` dispatcato da ollama.js e ascoltato da voice-control.js e system-ops.js
+- **Eventi DOM personalizzati**: `savia-response-complete` dispatcato da cognitive.js e ascoltato da voice-control.js e system-ops.js
 
 ---
 
@@ -88,7 +88,7 @@ S.A.V.I.A/
 │   │
 │   ├── shared.js             # Utility condivise tra tutte le pagine
 │   ├── agents.js             # Router multi-agente e definizioni
-│   ├── ollama.js             # Ponte AI Ollama + chat + TTS + STAND BY
+│   ├── cognitive.js          # Ponte AI multi-provider + chat + TTS + STAND BY
 │   ├── telemetry.js          # Monitoraggio sistema in tempo reale
 │   ├── memory.js             # Memoria contestuale personale
 │   ├── system-ops.js         # Esecuzione comandi di sistema
@@ -134,7 +134,7 @@ Il processo principale Electron. Crea la finestra, gestisce i servizi di sistema
 - **Trasporti supportati**: `stdio` (processo locale: `npx`, `node`, `python`...), `sse` (Server-Sent Events) e `streamable-http`.
 - **Discovery tool**: ogni server connesso espone la sua lista `tools/list`; i tool confluiscono in una lista piatta disponibile all'agente cognitivo (`listTools`).
 - **Chiamata tool**: `callTool` inoltra la richiesta al server e converte la risposta (testo, immagini, risorse) in testo leggibile per l'AI.
-- **Eventi**: `status` e `tools` vengono inoltrati a tutta la UI via `mcp-event` (push) — la cache `window.MCP_TOOL_DOCS` in `ollama.js` si aggiorna live.
+- **Eventi**: `status` e `tools` vengono inoltrati a tutta la UI via `mcp-event` (push) — la cache `window.MCP_TOOL_DOCS` in `cognitive.js` si aggiorna live.
 - **Config + autostart**: l'elenco server vive in `savia-config.json` (`mcpServers`); all'avvio di S.A.V.I.A vengono connessi automaticamente i server con `enabled: true`.
 - **Agent tool**: l'AI può chiamare qualunque tool MCP con `[TOOL] mcp:<serverId> <toolName> <json>` (vedi `parseAgentTools`).
 - **UI**: pagina `mcp.html` per aggiungere/modificare/rimuovere server, avviarli/fermarli e testarne i tool manualmente (JSON args + CALL).
@@ -181,7 +181,7 @@ Layout a 3 pannelli:
 
 **Scripts caricati:**
 ```
-shared.js → agents.js → ollama.js → telemetry.js → memory.js
+shared.js → agents.js → cognitive.js → telemetry.js → memory.js
 → system-ops.js → voice-control.js → dashboard.js → knowledge-base.js
 ```
 
@@ -279,9 +279,9 @@ Definisce 4 agenti specializzati + routing automatico.
 - `[TOOL] imagine:descrizione` — genera prompt immagini
 - `[TOOL] mcp:<serverId> <toolName> {json}` — chiama un tool di un server MCP connesso (server/args autodiscovery)
 
-### `ollama.js` — Ponte AI
+### `cognitive.js` — Ponte AI (brain multi-provider)
 
-Il modulo centrale. Si connette a Ollama in locale, gestisce chat streaming, input vocale, comandi azione e TTS.
+Il modulo centrale. Si connette al provider AI selezionato (OpenRouter / OpenCode / Ollama locale), gestisce chat streaming, input vocale, comandi azione e TTS.
 
 **Flusso chat (submit del form):**
 
@@ -511,10 +511,10 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 
 | Servizio | Endpoint | Utilizzo | Modulo |
 |----------|----------|----------|--------|
-| **Ollama** | `localhost:11434/api/tags` | Health check | ollama.js, commander.js |
-| **Ollama** | `localhost:11434/api/chat` | Chat completion (llama3) | ollama.js, commander.js |
+| **Ollama** | `localhost:11434/api/tags` | Health check | cognitive.js, commander.js |
+| **Ollama** | `localhost:11434/api/chat` | Chat completion (llama3) | cognitive.js, commander.js |
 | **Ollama** | `localhost:11434/api/embeddings` | Embedding testi (nomic-embed-text) | main.js (RAG) |
-| **ElevenLabs** | `api.elevenlabs.io/v1/text-to-speech/{voice}` | Text-to-speech | ollama.js |
+| **ElevenLabs** | `api.elevenlabs.io/v1/text-to-speech/{voice}` | Text-to-speech | cognitive.js |
 | **YouTube** | `www.googleapis.com/youtube/v3/*` | Ricerca e statistiche video | youtube.js |
 | **DuckDuckGo** | `api.duckduckgo.com` | Instant answer search | agents.js |
 | **Open-Meteo** | `api.open-meteo.com/v1/forecast` | Meteo città | globe.js |
