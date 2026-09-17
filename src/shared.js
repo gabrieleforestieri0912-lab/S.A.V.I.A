@@ -601,3 +601,51 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 })();
+
+// ── SYSTEM ACCESS (A) — Full / Restricted / Readonly + Audit ─────────
+(function () {
+  const badge = document.getElementById('sys-access-badge');
+  const dot = document.getElementById('sys-access-dot');
+  const txt = document.getElementById('sys-access-text');
+  const sel = document.getElementById('sys-access-mode');
+  const allowEl = document.getElementById('sys-allowlist');
+  const auditBtn = document.getElementById('btn-sys-audit');
+
+  async function refreshAccess() {
+    if (!window.electronAPI || !window.electronAPI.systemIsAdmin) return;
+    try {
+      const r = await window.electronAPI.systemIsAdmin();
+      if (badge) { badge.textContent = r.mode.toUpperCase(); badge.style.background = r.mode==='full' ? 'var(--accent-cyan)' : r.mode==='restricted' ? 'var(--accent-gold)' : '#ff2a5f'; }
+      if (dot) dot.style.background = r.isAdmin ? 'var(--accent-cyan)' : 'var(--accent-gold)';
+      if (txt) txt.textContent = (r.isAdmin ? 'ADMIN' : 'USER') + ' · ' + r.mode + (r.isAdmin ? '' : ' (non elevato: registry/servizi bloccati)');
+      if (sel) sel.value = r.mode;
+      if (allowEl) {
+        const al = (r.allowlist||[]).slice(0,4).map(p=> '✓ '+p).join('<br>');
+        const bl = (r.blocklist||[]).slice(0,2).map(p=> '✕ '+p).join('<br>');
+        allowEl.innerHTML = al + (bl ? '<br>'+bl : '') + `<br><span style="opacity:0.5">log: ${r.logPath||''}</span>`;
+      }
+    } catch (e) { if (txt) txt.textContent = 'error: '+e.message; }
+  }
+  if (sel) sel.addEventListener('change', async function(){
+    if (!window.electronAPI || !window.electronAPI.systemSetAccessMode) return;
+    const r = await window.electronAPI.systemSetAccessMode(this.value);
+    if (r.success) { addTickerEvent('sys', `SYSTEM ACCESS → ${r.mode.toUpperCase()}`); refreshAccess(); }
+    else addTickerEvent('warn', `Access mode: ${r.error}`);
+  });
+  if (auditBtn) auditBtn.addEventListener('click', async function(){
+    if (!window.electronAPI || !window.electronAPI.systemAuditLog) return;
+    const r = await window.electronAPI.systemAuditLog();
+    const content = r.success ? r.log : r.error;
+    // riusa modal logs per mostrare audit
+    const modal = document.getElementById('logs-modal');
+    const list = document.getElementById('modal-logs-list');
+    if (modal && list) {
+      list.innerHTML = `<pre style="font-size:9px;white-space:pre-wrap;word-break:break-all;">${content.slice(0,12000) || 'vuoto'}</pre>`;
+      modal.classList.remove('hidden-modal');
+    } else {
+      addTickerEvent('sys', content.slice(0,500));
+    }
+  });
+  document.addEventListener('DOMContentLoaded', refreshAccess);
+  setTimeout(refreshAccess, 800);
+})();

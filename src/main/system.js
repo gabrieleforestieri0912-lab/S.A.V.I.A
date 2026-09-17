@@ -9,7 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { spawn, execSync } = require('child_process');
-const { app, ipcMain, desktopCapturer, shell } = require('electron');
+const { app, ipcMain, desktopCapturer, shell, dialog, BrowserWindow } = require('electron');
 
 const APP_MAP = {
   'vscode': { cmd: 'code', path: null, process: 'Code.exe' },
@@ -125,6 +125,69 @@ const MEDIA_LABELS = { playpause: 'Play/Pausa', next: 'Traccia successiva', prev
 
 function sendKey(vk) {
   execSync(`powershell -NoProfile -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]${vk})"`, { windowsHide: true });
+}
+
+// ── A: Full Access — Audit, Allowlist, Confirmation ──────────────────
+const SYSTEM_LOG = path.join(app.getPath('userData'), 'savia-system-audit.log');
+const ALLOWLIST = [
+  os.homedir(),
+  path.join(os.homedir(), 'Documents'),
+  path.join(os.homedir(), 'Documents', 'Progetti'),
+  path.join(os.homedir(), 'Desktop'),
+  path.join(os.homedir(), 'Downloads'),
+  app.getPath('userData'),
+];
+const BLOCKLIST = [
+  path.join(process.env.WINDIR || 'C:\\Windows', 'System32'),
+  path.join(process.env.WINDIR || 'C:\\Windows', 'SysWOW64'),
+  'C:\\Windows\\System32\\config',
+];
+
+let systemAccessMode = 'full'; // full | restricted | readonly — persistito via config
+try {
+  const cfgPath = path.join(app.getPath('userData'), 'savia-config.json');
+  if (fs.existsSync(cfgPath)) {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    if (['full','restricted','readonly'].includes(cfg.systemAccessMode)) systemAccessMode = cfg.systemAccessMode;
+  }
+} catch {}
+
+function isAdminSync() {
+  try {
+    execSync('net session', { windowsHide: true, timeout: 3000 });
+    return true;
+  } catch { return false; }
+}
+
+function isPathAllowed(target) {
+  if (!target) return false;
+  const norm = path.resolve(target).toLowerCase();
+  if (BLOCKLIST.some(b => norm.startsWith(path.resolve(b).toLowerCase()))) return false;
+  if (systemAccessMode === 'readonly') return false;
+  if (systemAccessMode === 'full') return true;
+  // restricted: only allowlist
+  return ALLOWLIST.some(a => norm.startsWith(path.resolve(a).toLowerCase()));
+}
+
+function auditLog(action, details, result) {
+  const line = JSON.stringify({ ts: new Date().toISOString(), user: os.userInfo().username, action, details, result: String(result).slice(0, 800) });
+  try { fs.appendFileSync(SYSTEM_LOG, line + '\n', 'utf-8'); } catch {}
+}
+
+async function requestConfirmation(title, message) {
+  try {
+    const win = BrowserWindow.getAllWindows()[0];
+    const res = await dialog.showMessageBox(win || null, {
+      type: 'question',
+      buttons: ['Annulla', 'Esegui'],
+      defaultId: 0,
+      cancelId: 0,
+      title,
+      message,
+      detail: 'Richiesto da S.A.V.I.A. — accesso completo (A). Puoi revocare in SYSTEM ACCESS.',
+    });
+    return res.response === 1;
+  } catch { return false; }
 }
 
 function init() {
@@ -295,6 +358,113 @@ function init() {
     } catch (e) {
       return { success: false, error: e.message };
     }
+  });
+
+  // ── A: Full Access handlers ────────────────────────────────────────
+  ipcMain.handle('system-is-admin', () => ({ isAdmin: isAdminSync(), mode: systemAccessMode, allowlist: ALLOWLIST, blocklist: BLOCKLIST, logPath: SYSTEM_LOG }));
+  ipcMain.handle('system-set-access-mode', (event, mode) => {
+    if (!['full','restricted','readonly'].includes(mode)) return { success: false, error: 'mode invalido' };
+    systemAccessMode = mode;
+    try {
+      const cfgPath = path.join(app.getPath('userData'), 'savia-config.json');
+      const cfg = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf-8')) : {};
+      cfg.systemAccessMode = mode;
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf-8');
+    } catch {}
+    auditLog('set-access-mode', { mode }, 'ok');
+    return { success: true, mode };
+  });
+  ipcMain.handle('system-exec', async (event, { command, cwd }) => {
+    if (!command || typeof command !== 'string') return { success: false, error: 'comando vuoto' };
+    if (systemAccessMode === 'readonly') return { success: false, error: 'Modalità sola lettura — esecuzione bloccata' };
+    const destructive = /rm\s+-rf|del\s+\/[sfq]|format\s+[a-z]:|shutdown|reg\s+delete|mkfs|:\(\)\{\s*:\|:&\s*;\}/i.test(command) || /C:\\Windows/i.test(command);
+    if (destructive && !isPathAllowed(cwd || os.homedir())) {
+      const ok = await requestConfirmation('Conferma esecuzione', `Comando distruttivo rilevato:\n${command}\n\nCWD: ${cwd || os.homedir()}\n\nEseguire?`);
+      if (!ok) { auditLog('system-exec', { command, cwd }, 'blocked: user denied'); return { success: false, error: 'Esecuzione annullata da utente' }; }
+    }
+    try {
+      const out = execSync(command, { windowsHide: true, timeout: 15000, encoding: 'utf-8', cwd: cwd || os.homedir(), maxBuffer: 2 * 1024 * 1024 });
+      auditLog('system-exec', { command, cwd }, out.slice(0, 400));
+      return { success: true, output: out.slice(0, 8000) };
+    } catch (e) {
+      const msg = e.stdout ? String(e.stdout) : e.message;
+      auditLog('system-exec', { command, cwd }, `error: ${msg.slice(0,400)}`);
+      return { success: false, error: msg.slice(0, 2000) };
+    }
+  });
+  ipcMain.handle('system-fs-read', async (event, filePath) => {
+    try {
+      const data = fs.readFileSync(filePath, 'utf-8');
+      auditLog('fs-read', { filePath }, `ok ${data.length}`);
+      return { success: true, content: data.slice(0, 50000) };
+    } catch (e) { return { success: false, error: e.message }; }
+  });
+  ipcMain.handle('system-fs-write', async (event, { filePath, content }) => {
+    if (systemAccessMode === 'readonly') return { success: false, error: 'readonly' };
+    if (!isPathAllowed(filePath)) {
+      const ok = await requestConfirmation('Conferma scrittura', `Scrittura fuori allowlist:\n${filePath}\n\nConsentire?`);
+      if (!ok) return { success: false, error: 'Scrittura annullata' };
+    }
+    try {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, content || '', 'utf-8');
+      auditLog('fs-write', { filePath }, `ok ${String(content).length}`);
+      return { success: true };
+    } catch (e) { return { success: false, error: e.message }; }
+  });
+  ipcMain.handle('system-fs-delete', async (event, targetPath) => {
+    if (systemAccessMode === 'readonly') return { success: false, error: 'readonly' };
+    if (!isPathAllowed(targetPath)) {
+      const ok = await requestConfirmation('Conferma eliminazione', `Eliminazione fuori allowlist:\n${targetPath}`);
+      if (!ok) return { success: false, error: 'annullata' };
+    }
+    try {
+      const stat = fs.statSync(targetPath);
+      if (stat.isDirectory()) fs.rmSync(targetPath, { recursive: true, force: true });
+      else fs.unlinkSync(targetPath);
+      auditLog('fs-delete', { targetPath }, 'ok');
+      return { success: true };
+    } catch (e) { return { success: false, error: e.message }; }
+  });
+  ipcMain.handle('system-fs-list', async (event, dirPath) => {
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true }).map(e => ({ name: e.name, isDir: e.isDirectory(), path: path.join(dirPath, e.name) }));
+      return { success: true, entries };
+    } catch (e) { return { success: false, error: e.message }; }
+  });
+  ipcMain.handle('system-registry', async (event, { action, hive, key, name, value, type }) => {
+    if (systemAccessMode !== 'full') return { success: false, error: 'registry richiede modalità full' };
+    if (!isAdminSync()) return { success: false, error: 'richiede avvio come amministratore' };
+    try {
+      if (action === 'get') {
+        const out = execSync(`reg query "${hive}\\${key}" /v "${name}"`, { windowsHide: true, encoding: 'utf-8', timeout: 5000 }).trim();
+        auditLog('reg-get', { hive, key, name }, out.slice(0,400));
+        return { success: true, output: out };
+      }
+      if (action === 'set') {
+        const t = type || 'REG_SZ';
+        execSync(`reg add "${hive}\\${key}" /v "${name}" /t ${t} /d "${String(value).replace(/"/g,'\\"')}" /f`, { windowsHide: true, timeout: 5000 });
+        auditLog('reg-set', { hive, key, name, value }, 'ok');
+        return { success: true };
+      }
+      return { success: false, error: 'action get|set' };
+    } catch (e) { return { success: false, error: e.message }; }
+  });
+  ipcMain.handle('system-service', async (event, { action, name }) => {
+    if (systemAccessMode !== 'full') return { success: false, error: 'service richiede full' };
+    if (!isAdminSync()) return { success: false, error: 'richiede admin' };
+    try {
+      const cmd = action === 'start' ? `net start "${name}"` : action === 'stop' ? `net stop "${name}"` : `sc query "${name}"`;
+      const out = execSync(cmd, { windowsHide: true, encoding: 'utf-8', timeout: 8000 }).trim();
+      auditLog('service', { action, name }, out.slice(0,400));
+      return { success: true, output: out };
+    } catch (e) { return { success: false, error: e.message }; }
+  });
+  ipcMain.handle('system-audit-log', () => {
+    try {
+      const data = fs.existsSync(SYSTEM_LOG) ? fs.readFileSync(SYSTEM_LOG, 'utf-8').split('\n').filter(Boolean).slice(-100).join('\n') : '';
+      return { success: true, log: data };
+    } catch (e) { return { success: false, error: e.message }; }
   });
 
   ipcMain.handle('get-system-info', () => {

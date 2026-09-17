@@ -115,6 +115,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   systemMedia: (opts) => ipcRenderer.invoke('system-media', opts),
   systemScreenshot: () => ipcRenderer.invoke('system-screenshot'),
   systemOpenUrl: (url) => ipcRenderer.invoke('system-open-url', url),
+  // ── A: Full Access ────────────────────────────────────────────
+  systemIsAdmin: () => ipcRenderer.invoke('system-is-admin'),
+  systemSetAccessMode: (mode) => ipcRenderer.invoke('system-set-access-mode', mode),
+  systemExec: (opts) => ipcRenderer.invoke('system-exec', opts),
+  systemFsRead: (filePath) => ipcRenderer.invoke('system-fs-read', filePath),
+  systemFsWrite: (opts) => ipcRenderer.invoke('system-fs-write', opts),
+  systemFsDelete: (targetPath) => ipcRenderer.invoke('system-fs-delete', targetPath),
+  systemFsList: (dirPath) => ipcRenderer.invoke('system-fs-list', dirPath),
+  systemRegistry: (opts) => ipcRenderer.invoke('system-registry', opts),
+  systemService: (opts) => ipcRenderer.invoke('system-service', opts),
+  systemAuditLog: () => ipcRenderer.invoke('system-audit-log'),
 
   // Extended stats (async, non-blocking)
   getNetworkThroughput: () => ipcRenderer.invoke('get-network-throughput'),

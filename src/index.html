@@ -490,6 +490,21 @@
             </button>
           </div>
 
+          <div class="hud-control-group" id="system-access-group">
+            <h3>SYSTEM ACCESS <span id="sys-access-badge" style="font-size:7px;background:var(--accent-cyan);color:#000;padding:1px 4px;border-radius:2px;margin-left:6px;vertical-align:middle;">LOADING</span></h3>
+            <div class="agent-status-bar" style="margin-bottom:6px;">
+              <span class="agent-dot" id="sys-access-dot" style="background:#555"></span>
+              <span class="agent-status-text" id="sys-access-text" style="font-size:8px;">checking...</span>
+            </div>
+            <select id="sys-access-mode" class="hud-select" style="margin-bottom:6px;">
+              <option value="full">FULL — Esecuzione + FS + Registry/Servizi</option>
+              <option value="restricted">RESTRICTED — Solo allowlist</option>
+              <option value="readonly">READONLY — Solo lettura</option>
+            </select>
+            <button class="hud-action-btn" id="btn-sys-audit" style="font-size:9px;"><i class="fas fa-clipboard-list"></i> AUDIT LOG (100)</button>
+            <div id="sys-allowlist" style="font-size:8px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4;max-height:60px;overflow:auto;"></div>
+          </div>
+
           <div class="hud-control-group" id="editor-sidebar-section" style="display:none;">
             <h3>EDITOR FILE</h3>
             <div class="editor-sidebar-bar">

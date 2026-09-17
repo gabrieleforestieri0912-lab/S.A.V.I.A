@@ -166,6 +166,71 @@ async function executeAction(action) {
         addTickerEvent('warn', `[SYS] SMS errore: ${e.message}`);
       }
       break;
+
+    case 'exec':
+      if (!systemAPI || !systemAPI.systemExec) break;
+      try {
+        const result = await systemAPI.systemExec({ command: action.command, cwd: action.cwd });
+        if (result.success) {
+          addTickerEvent('sys', `[EXEC] ok: ${String(result.output).slice(0,120)}`);
+          appendLogMessage('sys', `<pre>${String(result.output).slice(0,1000)}</pre>`, 'system');
+        } else {
+          addTickerEvent('warn', `[EXEC] ${result.error}`);
+        }
+      } catch (e) { addTickerEvent('warn', `[EXEC] ${e.message}`); }
+      break;
+
+    case 'fs-read':
+      if (!systemAPI || !systemAPI.systemFsRead) break;
+      try {
+        const r = await systemAPI.systemFsRead(action.path);
+        if (r.success) appendLogMessage('sys', `<pre>${r.content.slice(0,1500)}</pre>`, 'system');
+        else addTickerEvent('warn', `[FS] read: ${r.error}`);
+      } catch (e) { addTickerEvent('warn', `[FS] ${e.message}`); }
+      break;
+
+    case 'fs-write':
+      if (!systemAPI || !systemAPI.systemFsWrite) break;
+      try {
+        const r = await systemAPI.systemFsWrite({ filePath: action.path, content: action.content });
+        addTickerEvent(r.success ? 'sys' : 'warn', r.success ? `[FS] scritto: ${action.path}` : `[FS] write: ${r.error}`);
+      } catch (e) { addTickerEvent('warn', `[FS] ${e.message}`); }
+      break;
+
+    case 'fs-delete':
+      if (!systemAPI || !systemAPI.systemFsDelete) break;
+      try {
+        const r = await systemAPI.systemFsDelete(action.path);
+        addTickerEvent(r.success ? 'sys' : 'warn', r.success ? `[FS] eliminato: ${action.path}` : `[FS] delete: ${r.error}`);
+      } catch (e) { addTickerEvent('warn', `[FS] ${e.message}`); }
+      break;
+
+    case 'fs-list':
+      if (!systemAPI || !systemAPI.systemFsList) break;
+      try {
+        const r = await systemAPI.systemFsList(action.path);
+        if (r.success) {
+          addTickerEvent('sys', `[FS] ${r.entries.length} voci in ${action.path}`);
+          r.entries.slice(0,10).forEach(en => appendLogMessage('sys', `${en.isDir ? '📁' : '📄'} ${en.name}`, 'system'));
+        } else addTickerEvent('warn', `[FS] list: ${r.error}`);
+      } catch (e) { addTickerEvent('warn', `[FS] ${e.message}`); }
+      break;
+
+    case 'registry':
+      if (!systemAPI || !systemAPI.systemRegistry) break;
+      try {
+        const r = await systemAPI.systemRegistry(action.opts);
+        addTickerEvent(r.success ? 'sys' : 'warn', r.success ? `[REG] ok: ${r.output?.slice(0,100) || 'ok'}` : `[REG] ${r.error}`);
+      } catch (e) { addTickerEvent('warn', `[REG] ${e.message}`); }
+      break;
+
+    case 'service':
+      if (!systemAPI || !systemAPI.systemService) break;
+      try {
+        const r = await systemAPI.systemService(action.opts);
+        addTickerEvent(r.success ? 'sys' : 'warn', r.success ? `[SVC] ${r.output?.slice(0,120)}` : `[SVC] ${r.error}`);
+      } catch (e) { addTickerEvent('warn', `[SVC] ${e.message}`); }
+      break;
   }
 }
 
@@ -292,6 +357,43 @@ async function processSystemCommands(text) {
           executed = true;
         }
         break;
+
+      case 'exec':
+        await executeAction({ type: 'exec', command: cmd.args, cwd: null });
+        executed = true; break;
+      case 'fs-read':
+        await executeAction({ type: 'fs-read', path: cmd.args });
+        executed = true; break;
+      case 'fs-write':
+        {
+          const sp = cmd.args.split('|').map(s=>s.trim());
+          await executeAction({ type: 'fs-write', path: sp[0], content: sp.slice(1).join('|') });
+          executed = true;
+        }
+        break;
+      case 'fs-delete':
+        await executeAction({ type: 'fs-delete', path: cmd.args });
+        executed = true; break;
+      case 'fs-list':
+        await executeAction({ type: 'fs-list', path: cmd.args || '.' });
+        executed = true; break;
+      case 'reg':
+      case 'registry':
+        {
+          const sp = cmd.args.split('|').map(s=>s.trim());
+          // format: hive|key|name|value  (get if value missing)
+          const opts = sp.length >= 4 ? { action: 'set', hive: sp[0], key: sp[1], name: sp[2], value: sp[3] } : { action: 'get', hive: sp[0], key: sp[1], name: sp[2] };
+          await executeAction({ type: 'registry', opts });
+          executed = true;
+        }
+        break;
+      case 'service':
+        {
+          const sp = cmd.args.split('|').map(s=>s.trim());
+          await executeAction({ type: 'service', opts: { action: sp[0] || 'query', name: sp[1] || sp[0] } });
+          executed = true;
+        }
+        break;
     }
   }
 
@@ -319,18 +421,25 @@ SISTEMA: Hai il controllo completo del computer. Usa [CMD] SOLO se l'utente chie
 NON aprire MAI applicazioni se l'utente chiede solo di analizzare, leggere o esaminare file/cartelle/progetti.
 NON aprire l'editor di codice se non richiesto esplicitamente.
 
-Comandi disponibili:
-[CMD] open:nomeapp - Apri un'app (SOLO su richiesta esplicita)
-[CMD] close:nomeapp - Chiudi un'app
-[CMD] volume:su/giù/mute/50% - Controlla volume
-[CMD] brightness:70 - Imposta luminosità (0-100)
-[CMD] search:query - Cerca file
-[CMD] move:sorgente → destinazione - Sposta file
-[CMD] media:play/pausa/next/prev/stop - Controllo riproduzione multimediale
-[CMD] screenshot - Cattura lo schermo e salva in Pictures/SAVIA
-[CMD] whatsapp:numero - messaggio - Invia un messaggio WhatsApp (formato: numero - testo)
-[CMD] sms:numero - messaggio - Invia un SMS (formato: numero - testo)
-[CMD] quit - Spegni completamente S.A.V.I.A (SOLO su richiesta esplicita dell'utente)
+ Comandi disponibili (A: accesso esteso con conferma per distruttivi, audit in savia-system-audit.log):
+ [CMD] open:nomeapp - Apri un'app (SOLO su richiesta esplicita)
+ [CMD] close:nomeapp - Chiudi un'app
+ [CMD] volume:su/giù/mute/50% - Controlla volume
+ [CMD] brightness:70 - Imposta luminosità (0-100)
+ [CMD] search:query - Cerca file
+ [CMD] move:sorgente → destinazione - Sposta file
+ [CMD] media:play/pausa/next/prev/stop - Controllo multimediale
+ [CMD] screenshot - Cattura schermo in Pictures/SAVIA
+ [CMD] exec:comando - Esegue shell (powershell/cmd) — chiede conferma se distruttivo
+ [CMD] fs-read:path - Legge file (50k char)
+ [CMD] fs-write:path|contenuto - Scrive file (fuori allowlist chiede conferma)
+ [CMD] fs-delete:path - Elimina file/dir (conferma fuori allowlist)
+ [CMD] fs-list:dir - Lista directory
+ [CMD] registry:hive|key|name|value - Reg get/set (full+admin)
+ [CMD] service:start|nome - Gestione servizi (full+admin)
+ [CMD] whatsapp:numero - messaggio
+ [CMD] sms:numero - messaggio
+ [CMD] quit - Spegni S.A.V.I.A
 
 Scenario predefiniti: ${scenarioNames}
 Quando l'utente chiede esplicitamente di preparare un ambiente di lavoro, usa lo scenario appropriato con [CMD] e descrivi cosa hai fatto.
