@@ -8,6 +8,8 @@ import { AgentName } from "./agents/index.js";
 import { JobQueue, type Notifier } from "./jobQueue.js";
 import type { ExecJob } from "./executor.js";
 import { connectNotionMcp, notion } from "./notionMcp.js";
+import { healthMonitor, redactSecrets } from "./healthMonitor.js";
+import { handleSelfHeal, getSelfHealState, resetSelfHeal } from "./selfHeal.js";
 
 const LOGO_PATH = path.resolve(process.cwd(), "..", "savia.png");
 
@@ -43,7 +45,15 @@ async function sendReply(chatId: string, text: string): Promise<void> {
       error: err instanceof Error ? err.message : String(err),
     });
   }
-  await bot.sendMessage(chatId, text);
+  try {
+    await bot.sendMessage(chatId, text);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log({ level: "error", event: "telegram_send_failed", chatId, error: redactSecrets(msg).slice(0, 600) });
+    // core scope → health monitor (potenziale credenziale scaduta → escluso)
+    healthMonitor.recordError(new Error(`telegram_send_failed: ${msg}`), "core");
+    throw err;
+  }
 }
 
 const notifier: Notifier = {
@@ -53,6 +63,35 @@ const notifier: Notifier = {
 };
 
 const jobQueue = new JobQueue(notifier);
+
+// ── HealthMonitor wiring (core only) ──────────────────────────────────
+healthMonitor.onThreshold(async (event) => {
+  await handleSelfHeal(event, notifier);
+});
+
+// Global crash handlers — livello 1 resilienza è PM2, qui logghiamo e tracciamo
+process.on("uncaughtException", (err) => {
+  const redacted = redactSecrets(err.stack || err.message);
+  log({ level: "error", event: "uncaught_exception", error: redacted.slice(0, 2000) });
+  console.error("uncaughtException:", redacted.slice(0, 800));
+  healthMonitor.recordError(err, "core", { fileHint: "uncaughtException" });
+  // non exit: PM2 riavvierà se necessario, ma proviamo a restare up per loggare
+});
+
+process.on("unhandledRejection", (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  const redacted = redactSecrets(err.stack || err.message);
+  log({ level: "error", event: "unhandled_rejection", error: redacted.slice(0, 2000) });
+  console.error("unhandledRejection:", redacted.slice(0, 800));
+  healthMonitor.recordError(err, "core", { fileHint: "unhandledRejection" });
+});
+
+bot.on("polling_error", (error: Error) => {
+  const redacted = redactSecrets(error.message);
+  log({ level: "error", event: "polling_error", error: redacted.slice(0, 600) });
+  console.error("Polling error:", redacted.slice(0, 400));
+  healthMonitor.recordError(error, "core");
+});
 
 bot.on("message", async (msg) => {
   const chatId = String(msg.chat.id);
@@ -64,6 +103,12 @@ bot.on("message", async (msg) => {
   }
 
   if (!text) {
+    return;
+  }
+
+  // ── Self-heal commands (perimetro: solo S.A.V.I.A core) ──────────────
+  if (text.startsWith("/heal")) {
+    await handleHealCommand(chatId, text);
     return;
   }
 
@@ -115,7 +160,8 @@ bot.on("message", async (msg) => {
     jobQueue.enqueue(job);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    log({ level: "error", event: "parse_failed", chatId, error: message });
+    log({ level: "error", event: "parse_failed", chatId, error: redactSecrets(message).slice(0, 600) });
+    healthMonitor.recordError(err instanceof Error ? err : new Error(message), "core", { fileHint: "parser.ts" });
     await sendReply(
       chatId,
       "⚠️ Si è verificato un errore durante l'elaborazione del messaggio " +
@@ -124,10 +170,73 @@ bot.on("message", async (msg) => {
   }
 });
 
-bot.on("polling_error", (error: Error) => {
-  log({ level: "error", event: "polling_error", error: error.message });
-  console.error("Polling error:", error.message);
-});
+async function handleHealCommand(chatId: string, raw: string): Promise<void> {
+  const parts = raw.trim().split(/\s+/);
+  const sub = (parts[1] || "").toLowerCase();
+  const rest = raw.trim().slice((parts[0] + (parts[1] ? " " + parts[1] : "")).length).trim();
+  try {
+    switch (sub) {
+      case "status": {
+        const state = getSelfHealState();
+        const lines: string[] = [];
+        lines.push(`🩺 Self-healing status — pending: ${state.globalPendingCount}/2`);
+        const entries = Object.values(state.errors);
+        if (!entries.length) {
+          lines.push("Nessun errore tracciato.");
+        } else {
+          for (const r of entries.slice(0, 10)) {
+            const pend = r.pendingPrUrl ? `→ PR: ${r.pendingPrUrl}` : "";
+            const dis = r.disabled ? `⛔ disabilitato fino ${r.disabledUntil} (${r.disabledReason})` : "";
+            lines.push(`- ${r.signature.slice(0, 70)} — ${r.count} occ. ultima: ${r.lastSeen} ${pend} ${dis}`.trim());
+          }
+          if (entries.length > 10) lines.push(`... e altri ${entries.length - 10} signatures`);
+        }
+        await sendReply(chatId, lines.join("\n").slice(0, 3800));
+        return;
+      }
+      case "reset": {
+        if (!rest) {
+          resetSelfHeal();
+          await sendReply(chatId, "✅ Circuit breaker resettato: tutte le firme azzerate.");
+        } else {
+          resetSelfHeal(rest);
+          await sendReply(chatId, `✅ Firma resettata: ${rest.slice(0, 120)}`);
+        }
+        return;
+      }
+      case "logs": {
+        const state = getSelfHealState();
+        const sig = rest;
+        if (!sig) {
+          await sendReply(chatId, "Uso: /heal logs <signature>  oppure  /heal logs all");
+          return;
+        }
+        if (sig === "all") {
+          const recent = healthMonitor.getRecentLogs(20).map(redactSecrets).join("\n").slice(0, 3500);
+          await sendReply(chatId, `📋 Ultime 20 righe di log (redatte):\n${recent}`);
+          return;
+        }
+        const rec = state.errors[sig] || Object.values(state.errors).find((r) => r.signature.includes(sig));
+        if (!rec) {
+          await sendReply(chatId, `Nessuna firma trovata per: ${sig.slice(0, 80)}`);
+          return;
+        }
+        await sendReply(chatId, `📋 ${rec.signature}\nOccorrenze: ${rec.occurrences.join(", ").slice(0, 1000)}\nPending: ${rec.pendingPrUrl || "-"}\nDisabled: ${rec.disabled ? rec.disabledUntil : "no"}`);
+        return;
+      }
+      default:
+        await sendReply(
+          chatId,
+          "🩺 Comandi self-healing:\n" +
+            "/heal status — stato circuit breaker e PR pendenti\n" +
+            "/heal reset [signature] — resetta una firma o tutto\n" +
+            "/heal logs <signature|all> — mostra log recenti\n"
+        );
+    }
+  } catch (err) {
+    await sendReply(chatId, `⚠️ Errore heal: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 async function handleNotionCommand(chatId: string, raw: string): Promise<void> {
   const parts = raw.trim().split(/\s+/);
@@ -207,4 +316,4 @@ async function handleNotionCommand(chatId: string, raw: string): Promise<void> {
   }
 }
 
-console.log("S.A.V.I.A — Second Brain Remote Control (Fase 2) in ascolto...");
+console.log("S.A.V.I.A — Second Brain Remote Control (Fase 4 self-healing) in ascolto...");

@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop savia-bot",
+    "pm2:restart": "pm2 restart savia-bot",
+    "pm2:logs": "pm2 logs savia-bot",
+    "pm2:save": "pm2 save",
+    "pm2:startup": "pm2 startup"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

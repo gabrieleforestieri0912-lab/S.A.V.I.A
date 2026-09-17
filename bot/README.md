@@ -143,10 +143,73 @@ Ho verificato i CLI sul sistema al momento dello sviluppo:
   tuo sistema. FreeBuff deve essere già autenticato (`freebuff login`) o resterà appeso
   alla richiesta di login.
 
+## Fase 4 — Self-Healing (auto-guarigione del sistema S.A.V.I.A. stesso)
+
+> Perimetro: riguarda **solo** il codice di S.A.V.I.A. (`bot/`, `parser`, `gitOps`...), **mai** i progetti che gestisce. Mai merge/riavvio automatico — solo branch+PR, come Fasi 2/3.
+
+### Livelli
+
+| Livello | Cosa | Autonomia |
+|---|---|---|
+| **1 — Supervisor** | PM2 riavvia il bot su crash / al boot Windows | totalmente automatico |
+| **2 — HealthMonitor** | traccia `uncaughtException`, `unhandledRejection`, `polling_error`, `telegram_send_failed`, `parse_failed` in `health-state.json`; soglia **3 occorrenze stessa firma / 30 min** | log only sotto soglia |
+| **3 — Diagnosi** | superata soglia → ultime 50 righe di log + stack (redatti) → OpenRouter → JSON `{cause, filesToModify, promptForAgent, confidence}`; se `confidence != high` o `isAuthError` → solo notifica | automatico fino a diagnosi |
+| **4 — Auto-correzione** | se `confidence==high` → branch `savia/self-heal/<ts>-<slug>` sul repo S.A.V.I.A. → `OpenCode` con prompt diagnosi → commit/push/PR via `gh` → notifica Telegram | **mai oltre PR**, mai riavvio automatico |
+
+### Circuit breaker (obbligatorio)
+
+- Stessa firma con PR già pendente → `⚠️ PR già in attesa: <link>` (no duplicato)
+- Max 2 PR self-heal pendenti globali → terzo errore → solo log+notifica
+- Se dopo merge lo stesso errore ritorna entro 24h → `🚨 Fix non ha risolto, disattivo self-healing per quella firma 24h`
+
+### Secret redaction
+
+Prima di ogni invio a OpenRouter i log vengono redatti: `sk-or-*`, `sk-*`, `ghp_*`, `Bearer ...`, `*_TOKEN=...` → `[REDACTED]`.
+
+### Avvio via PM2 (invece di `npm run dev`)
+
+```powershell
+cd bot
+npm i -g pm2
+pm2 start ecosystem.config.js   # o npm run pm2:start
+pm2 logs savia-bot
+pm2 save
+pm2 startup   # genera comando da eseguire come admin per avvio al boot Windows
+# Windows: esegui il comando stampato da pm2 startup (es. con pm2-windows-startup)
+```
+
+Dettagli `ecosystem.config.js`: `max_restarts:10`, `min_uptime:"10s"` (evita loop infinito), `restart_delay:3s`, `max_memory_restart:"400M"`, log in `logs/pm2-*.log`.
+
+Ogni crash/restart è loggato in `logs/savia.log` con timestamp (via `process.on` + PM2 logs).
+
+### Comandi Telegram per il self-healing
+
+```
+/heal status              # firme tracciate, pending PR, disabled
+/heal logs all            # ultime 20 righe di log redatte
+/heal logs <signature>    # dettaglio occorrenze per firma
+/heal reset [signature]   # resetta una firma o tutto il breaker
+```
+
+### File nuovi
+
+- `src/healthMonitor.ts` — normalizzazione firme, persistenza `health-state.json`, soglia, esclusioni auth
+- `src/selfHeal.ts` — diagnosi OpenRouter + branch/PR su repo S.A.V.I.A.
+- `ecosystem.config.js` — PM2 supervisor
+- `health-state.json` — stato persistito (gitignored), `logs/savia.log` — log esistente
+
+### Guardrail Fase 4
+
+- Mai modifiche ai progetti gestiti per errori del core (e viceversa)
+- Mai merge/restart automatico — il bot continua sul codice *attuale* finché non mergi tu
+- Esclusi a priori dal self-heal: errori di credenziali (Telegram token, OpenRouter key, `gh auth`) → solo notifica
+
 ## Struttura
-- `src/index.ts` — entry point: bot Telegram, whitelist, routing, coda
+- `src/index.ts` — entry point: bot Telegram, whitelist, routing, coda, **healthMonitor + selfHeal wiring**
 - `src/config.ts` — caricamento env e `projects.config.json`
 - `src/parser.ts` — chiamata a OpenRouter e parsing del JSON di risposta
+- `src/healthMonitor.ts` — tracking errori core, firma normalizzata, soglia, redaction, persistenza
+- `src/selfHeal.ts` — diagnosi OpenRouter + branch/PR S.A.V.I.A. + circuit breaker
 - `src/agents/` — `AgentRunner`, `OpenCodeRunner`, `FreeBuffRunner`
 - `src/gitOps.ts` — operazioni Git (clean check, branch, commit, push, stash, cleanup)
 - `src/prOps.ts` — interazione con `gh` (auth check, default branch, creazione PR)
@@ -154,6 +217,8 @@ Ho verificato i CLI sul sistema al momento dello sviluppo:
 - `src/executor.ts` — orchestrazione del job (branch → agente → commit → notifica)
 - `src/logger.ts` — logging su `logs/savia.log` in formato JSON lines
 - `src/util.ts` — utilità (kill tree su timeout)
+- `ecosystem.config.js` — PM2 supervisor
+- `health-state.json` — stato self-healing (non committato)
 - `projects.config.json` — definizione progetti/alias
 - `logs/savia.log` — log di esecuzione (non committato)
 
