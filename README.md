@@ -4,7 +4,7 @@
 
 **Versione:** 4.0.0
 **Runtime:** Electron 31 + Node.js
-**AI Engine:** Ollama (llama3, nomic-embed-text) — modello selezionabile
+**AI Engine:** Multi-provider (OpenRouter / OpenCode / Local) — modello selezionabile
 **Tema:** Cyberpunk HUD — Ispirato a JARVIS
 
 ---
@@ -151,7 +151,7 @@ Estrazione testo (per tipo file)
 Chunking (1500 caratteri, 200 overlap)
     │
     ▼
-Embedding via Ollama nomic-embed-text
+Embedding via Local AI (nomic-embed-text)
     │
     ▼
 Salvataggio in knowledge-base.json
@@ -244,7 +244,7 @@ shared.js → agents.js → cognitive.js → telemetry.js → memory.js
 ### `shared.js` — Utility Condivise
 
 Caricato da ogni pagina HTML. Gestisce:
-- Stato globale: `soundEnabled`, `overclockEnabled`, `scanlinesEnabled`, `ollamaOnline`
+- Stato globale: `soundEnabled`, `overclockEnabled`, `scanlinesEnabled`, `aiOnline`
 - `updateClock()` — aggiorna orologio HUD ogni secondo
 - `addTickerEvent(prefix, msg)` — eventi nel ticker e log modale
 - `setServiceStatus(el, status)` — indicatori stato servizi
@@ -281,7 +281,7 @@ Definisce 4 agenti specializzati + routing automatico.
 
 ### `cognitive.js` — Ponte AI (brain multi-provider)
 
-Il modulo centrale. Si connette al provider AI selezionato (OpenRouter / OpenCode / Ollama locale), gestisce chat streaming, input vocale, comandi azione e TTS.
+Il modulo centrale. Si connette al provider AI selezionato (OpenRouter / OpenCode / Local), gestisce chat streaming, input vocale, comandi azione e TTS.
 
 **Flusso chat (submit del form):**
 
@@ -315,7 +315,7 @@ Auto-speak (ElevenLabs TTS) + log conversazione in memoria
 **STAND BY (pausa/ripresa):** mentre una risposta viene generata o letta ad alta voce, S.A.V.I.A può essere messa in pausa e ripresa **esattamente dal punto in cui era rimasta**:
 - Comandi rapidi: **"mettiti in pausa" / "pausa" / "standby"** e **"ricomincia" / "riprendi" / "riparti"** — intercettati come fast-path *prima* di `stopSpeaking()`, per non cancellare la sintesi in corso.
 - **TTS in corso** → pausa/ripresa nativa (`synth.pause()/resume()` su Web Speech, `audio.pause()/play()` su ElevenLabs): la voce riprende dalla parola esatta.
-- **Stream Ollama in corso** → il loop di generazione si blocca su un gate (`waitIfStandby`) e riprende dal token successivo; `streamActive` viene azzerato nei `catch` e da `resetStandby()` quando arriva una nuova query.
+- **Stream AI in corso** → il loop di generazione si blocca su un gate (`waitIfStandby`) e riprende dal token successivo; `streamActive` viene azzerato nei `catch` e da `resetStandby()` quando arriva una nuova query.
 - **UI**: pulsante `STAND BY (PAUSA)` ⇄ `RIPRENDI (RICOMINCIA)` nel pannello VOICE INTERFACE, indicatore gold su `agent-status-text`/`agent-dot`, ticker + notifica.
 - **API**: `window.saviaStandbyPause()` / `window.saviaStandbyResume()`.
 - Stato vocale: il consumo di un comando standby emette `savia-standby-command`, che ripristina il riconoscimento vocale (evita di restare bloccati in `PROCESSING`).
@@ -394,7 +394,7 @@ IDLE → WAKE_LISTEN → "Hey SAVIA" → WAKE_HEARD
 - Navigazione con cronologia (back/forward/up)
 - Icone per tipo file (100+ mappature)
 - Menu contestuale: Rinomina, Elimina, Copia percorso, Apri in Explorer
-- Smart Scanner AI: descrive ogni file con Ollama (batch 5 file)
+- Smart Scanner AI: descrive ogni file con AI locale (batch 5 file)
 
 **Terminale Emulatore:**
 - Shell reale via IPC (cmd.exe/bash)
@@ -466,7 +466,7 @@ IDLE → WAKE_LISTEN → "Hey SAVIA" → WAKE_HEARD
                   │
           ┌───────▼───────┐
           │  Chat con      │─── POST /api/chat → llama3
-          │  Ollama        │      Stream risposta JSON
+          │  AI Provider   │      Stream risposta JSON
           └───────┬───────┘
                   │
           ┌───────▼───────┐
@@ -511,9 +511,9 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 
 | Servizio | Endpoint | Utilizzo | Modulo |
 |----------|----------|----------|--------|
-| **Ollama** | `localhost:11434/api/tags` | Health check | cognitive.js, commander.js |
-| **Ollama** | `localhost:11434/api/chat` | Chat completion (llama3) | cognitive.js, commander.js |
-| **Ollama** | `localhost:11434/api/embeddings` | Embedding testi (nomic-embed-text) | main.js (RAG) |
+| **Local AI** | `localhost:11434/api/tags` | Health check | cognitive.js, commander.js |
+| **Local AI** | `localhost:11434/api/chat` | Chat completion | cognitive.js, commander.js |
+| **Local AI** | `localhost:11434/api/embeddings` | Embedding testi (nomic-embed-text) | main.js (RAG) |
 | **ElevenLabs** | `api.elevenlabs.io/v1/text-to-speech/{voice}` | Text-to-speech | cognitive.js |
 | **YouTube** | `www.googleapis.com/youtube/v3/*` | Ricerca e statistiche video | youtube.js |
 | **DuckDuckGo** | `api.duckduckgo.com` | Instant answer search | agents.js |
@@ -533,7 +533,7 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 - **Screenshot reale**: `[CMD] screenshot` cattura lo schermo e salva in `Pictures/SAVIA` (desktopCapturer).
 - **Volume reale (CoreAudio)**: get/set volume tramite P/Invoke PowerShell (Add-Type), niente più hack SendKeys.
 - **Batteria in telemetria**: Power Cell gauge nella sidebar con percentuale/stato di carica (Win32_Battery).
-- **Modello AI selezionabile**: menu `AI MODEL` popolato da `/api/tags` — scegli il modello Ollama attivo (persistito in config).
+- **Modello AI selezionabile**: menu `AI MODEL` popolato da `/api/tags` — scegli il modello AI attivo (persistito in config).
 - **Config file**: `savia-config.json` (userData) per chiavi API e impostazioni — la chiave ElevenLabs non è più hardcoded nel codice.
 - **Saluto contestuale**: benvenuto JARVIS basato sull'ora del giorno (buongiorno/pomeriggio/sera) con fallback vocale locale.
 - **Pannello UPCOMING SCHEDULE nella Dashboard**: agenda unificata (eventi + promemoria + todo + obiettivi) con countdown live, alert acustico/visivo alla scadenza con toggle volume, azioni inline complete/elimina con animazioni di fade-out, beep di conferma e notifica `OBIETTIVO COMPLETATO` con conteggio progressi.

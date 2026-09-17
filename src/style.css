@@ -1410,7 +1410,7 @@ body.boot-locked { overflow: hidden; }
 .log-message.system .log-text { color: var(--accent-cyan); }
 .log-message.error .log-text { color: #ffb3c1; background: rgba(255, 42, 95, 0.1); padding: 8px 12px; border-left: 3px solid var(--accent-red); display: block; margin-top: 5px; border-radius: 0 4px 4px 0; }
 
-.ollama-command-hint { font-weight: bold; color: #fff !important; background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 3px; }
+.ai-command-hint { font-weight: bold; color: #fff !important; background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 3px; }
 
 #typing-indicator { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; padding: 8px 12px; background: rgba(157, 78, 221, 0.05); border-left: 2px solid var(--accent-purple); animation: typing-fade 0.3s ease-out; }
 @keyframes typing-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -1867,7 +1867,7 @@ body.boot-locked { overflow: hidden; }
 .module-item .item-status.online#particles-nav-dot { background-color: #00ff88; box-shadow: 0 0 6px #00ff88; animation: telemetry-warning-flash 1.5s infinite; }
 
 .modal-log-badge.particles { background: var(--accent-purple-dim); color: var(--accent-purple); border: 1px solid rgba(157, 78, 221, 0.3); }
-.modal-log-badge.ollama { background: var(--accent-gold-dim); color: var(--accent-gold); border: 1px solid rgba(255, 183, 3, 0.3); }
+.modal-log-badge.ai { background: var(--accent-gold-dim); color: var(--accent-gold); border: 1px solid rgba(255, 183, 3, 0.3); }
 
 .micro-stats { font-size: 9px; color: rgba(255, 255, 255, 0.3); letter-spacing: 1px; }
 

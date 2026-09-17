@@ -7,7 +7,7 @@
  *   2) Il webhook risponde con TwiML <Connect><Stream> → WebSocket
  *      Media Streams (audio μ-law 8 kHz).
  *   3) Pipeline per ogni chiamata:
- *        μ-law → PCM → VAD → Whisper locale (STT) → Ollama (cervello)
+ *        μ-law → PCM → VAD → Whisper locale (STT) → AI (cervello)
  *        → ElevenLabs (TTS) → PCM → μ-law → rispedita su Media Streams.
  *
  * Nota: gira nel processo main (rete locale) così resta attivo anche
@@ -181,7 +181,7 @@ async function transcribe(pcm16) {
 }
 
 // ============================================================
-// CERVELLO — Ollama
+// CERVELLO — AI
 // ============================================================
 async function askBrain(session, text) {
   const messages = [
@@ -202,7 +202,7 @@ async function askBrain(session, text) {
     reply = reply.replace(/\[ACTION:[^\]]*\]/gi, '').replace(/\[TOOL\][\s\S]*$/gi, '').replace(/\*\*/g, '').trim();
     return reply;
   } catch (e) {
-    emit('call', { type: 'error', message: 'Ollama unreachable: ' + e.message });
+    emit('call', { type: 'error', message: 'AI unreachable: ' + e.message });
     return 'Il mio cervello neurale è momentaneamente offline. Riprova tra poco, sir.';
   }
 }

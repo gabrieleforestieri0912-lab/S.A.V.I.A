@@ -1545,7 +1545,7 @@ const BUILTIN_EXTENSIONS = [
   { id: 'savia.python-tools', name: 'Python Tools', desc: 'Linting and formatting for Python', installed: false, icon: 'fab fa-python' },
   { id: 'savia.docker', name: 'Docker', desc: 'Dockerfile and docker-compose language support', installed: true, icon: 'fab fa-docker' },
   { id: 'savia.indent-rainbow', name: 'Indent Rainbow', desc: 'Colorizes indentation levels for readability', installed: false, icon: 'fas fa-indent' },
-  { id: 'savia.ai-copilot', name: 'AI Copilot', desc: 'Inline code completions powered by Ollama', installed: false, icon: 'fas fa-robot' },
+  { id: 'savia.ai-copilot', name: 'AI Copilot', desc: 'Inline code completions powered by AI', installed: false, icon: 'fas fa-robot' },
   { id: 'savia.git-graph', name: 'Git Graph', desc: 'Visualize git history as a graph', installed: false, icon: 'fas fa-project-diagram' },
   { id: 'savia.live-server', name: 'Live Server', desc: 'Launch a local dev server with hot reload', installed: false, icon: 'fas fa-server' },
   { id: 'savia.snippets', name: 'Code Snippets', desc: 'Collection of useful code snippets', installed: true, icon: 'fas fa-puzzle-piece' },

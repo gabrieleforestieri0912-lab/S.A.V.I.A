@@ -121,7 +121,7 @@ function classifyByKeywords(query) {
 
 // LLM-based classifier
 async function classifyWithLLM(query) {
-  if (typeof ollamaOnline === 'undefined' || !ollamaOnline) return 'auto';
+  if (typeof aiOnline === 'undefined' || !aiOnline) return 'auto';
   try {
     const promptSystem = `Classifica il messaggio utente in UNA di queste categorie. Rispondi SOLO con il nome della categoria, senza altro testo.
 
@@ -139,7 +139,7 @@ Esempi:
 "Crea un logo" → creativo
 "Come stai?" → auto`;
 
-    const model = typeof getActiveModel === 'function' ? getActiveModel() : (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter' ? 'nvidia/nemotron-3.5-lightning:free' : (typeof aiProvider !== 'undefined' && aiProvider === 'opencode' ? 'claude-sonnet-4-5' : 'mistral'));
+    const model = typeof getActiveModel === 'function' ? getActiveModel() : (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter' ? 'nvidia/nemotron-3.5-lightning:free' : (typeof aiProvider !== 'undefined' && aiProvider === 'opencode' ? 'claude-sonnet-4-5' : 'local-model'));
     let cls = '';
 
     if (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter') {
@@ -185,7 +185,8 @@ Esempi:
       const data = await res.json();
       cls = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
     } else {
-      const res = await fetch('http://localhost:11434/api/chat', {
+      const localHost = (typeof LOCAL_AI_HOST !== 'undefined' ? LOCAL_AI_HOST : 'http://localhost:11434');
+      const res = await fetch(`${localHost}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

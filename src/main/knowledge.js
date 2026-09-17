@@ -11,7 +11,7 @@ const { execSync } = require('child_process');
 const { app, ipcMain } = require('electron');
 
 const kbPath = path.join(app.getPath('userData'), 'knowledge-base.json');
-const OLLAMA_EMBED = 'http://localhost:11434/api/embeddings';
+const LOCAL_EMBED = 'http://localhost:11434/api/embeddings';
 
 const KB_CHUNK_SIZE = 1500;
 const KB_CHUNK_OVERLAP = 200;
@@ -51,7 +51,7 @@ function chunkText(text, filepath, docId) {
 
 async function embedText(text) {
   try {
-    const res = await fetch(OLLAMA_EMBED, {
+    const res = await fetch(LOCAL_EMBED, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'nomic-embed-text', prompt: text.substring(0, 8000) })

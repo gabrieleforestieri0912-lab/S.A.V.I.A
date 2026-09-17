@@ -181,7 +181,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendNotification: (opts) => ipcRenderer.invoke('send-notification', opts),
 
   // ============================================================
-  // CALL HOTLINE (Twilio + tunnel + STT/Ollama/TTS)
+  // CALL HOTLINE (Twilio + tunnel + STT/AI/TTS)
   // ============================================================
   callHotlineStart: () => ipcRenderer.invoke('call-hotline-start'),
   callHotlineStop: () => ipcRenderer.invoke('call-hotline-stop'),

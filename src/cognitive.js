@@ -1,8 +1,8 @@
 /**
- * S.A.V.I.A - Ollama Bridge & Chat Terminal Module
+ * S.A.V.I.A - Cognitive Bridge & Chat Terminal Module
  */
 
-const OLLAMA_HOST = 'http://localhost:11434';
+const LOCAL_AI_HOST = 'http://localhost:11434';
 const terminalLogs = document.getElementById('terminal-logs');
 const terminalInput = document.getElementById('terminal-input');
 const terminalForm = document.getElementById('terminal-input-form');
@@ -54,7 +54,7 @@ async function loadRuntimeConfig() {
   }
 }
 
-// Popola il selettore modello con i modelli installati su OpenRouter / OpenCode / Ollama
+// Popola il selettore modello con i modelli installati su OpenRouter / OpenCode / Local
 async function refreshModelList() {
   const sel = document.getElementById('model-select');
   if (!sel) return;
@@ -81,7 +81,7 @@ async function refreshModelList() {
       const data = await res.json();
       models = (data.data || []).map(m => m.id);
     } else {
-      const res = await fetch(`${OLLAMA_HOST}/api/tags`);
+      const res = await fetch(`${LOCAL_AI_HOST}/api/tags`);
       if (!res.ok) return;
       const data = await res.json();
       models = (data.models || []).map(m => m.name);
@@ -107,7 +107,7 @@ function applyModelToUI() {
   const modelInfo = document.getElementById('chat-model-info');
   const providerLabel = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter')
     ? 'OPENROUTER'
-    : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OPENCODE' : 'OLLAMA');
+    : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OPENCODE' : 'LOCAL');
   if (modelInfo) modelInfo.textContent = `INTELLIGENZA: ${providerLabel} // ${activeModel.toUpperCase()}`;
   const modelStatus = document.getElementById('model-status-text');
   if (modelStatus) modelStatus.textContent = `ACTIVE MODEL // ${activeModel.toUpperCase()}`;
@@ -123,7 +123,7 @@ if (document.getElementById('model-select')) {
     applyModelToUI();
     const providerLabel = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter')
       ? 'OpenRouter'
-      : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OpenCode' : 'Ollama');
+      : ((typeof aiProvider !== 'undefined' && aiProvider === 'opencode') ? 'OpenCode' : 'Local');
     addTickerEvent('agent', `Modello AI cambiato (${providerLabel}): ${activeModel}`);
   });
 }
@@ -133,8 +133,8 @@ let welcomeSent = sessionStorage.getItem('savia-welcome-sent') === 'true';
 window.__saviaWelcomeFirstSentence = false; // true quando il primo token del benvenuto AI è arrivato
 window.__saviaLocalGreetingSpoken = false;  // true quando il saluto locale è stato pronunciato
 
-const ollamaStatusDot = document.getElementById('ollama-status-dot');
-const ollamaStatusText = document.getElementById('ollama-status-text');
+const aiStatusDot = document.getElementById('ai-status-dot');
+const aiStatusText = document.getElementById('ai-status-text');
 function formatTimestamp() {
   const now = new Date();
   return `[${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
@@ -167,12 +167,12 @@ function appendLogMessage(sender, text, type) {
 
 let lastBridgeState = null;
 
-async function checkOllamaBridge() {
+async function checkAiBridge() {
   const startTime = Date.now();
   const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
   const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
-  const endpointDesc = isOpenRouter ? 'OpenRouter (openrouter.ai)' : (isOpenCode ? 'OpenCode Zen (opencode.ai)' : OLLAMA_HOST);
-  const providerName = isOpenRouter ? 'OpenRouter' : (isOpenCode ? 'OpenCode' : 'Ollama');
+  const endpointDesc = isOpenRouter ? 'OpenRouter (openrouter.ai)' : (isOpenCode ? 'OpenCode Zen (opencode.ai)' : LOCAL_AI_HOST);
+  const providerName = isOpenRouter ? 'OpenRouter' : (isOpenCode ? 'OpenCode' : 'Local');
   try {
     let res;
     if (isOpenRouter) {
@@ -186,12 +186,12 @@ async function checkOllamaBridge() {
         headers: { 'Authorization': `Bearer ${opencodeApiKey}` }
       });
     } else {
-      res = await fetch(`${OLLAMA_HOST}/api/tags`, { method: 'GET' });
+      res = await fetch(`${LOCAL_AI_HOST}/api/tags`, { method: 'GET' });
     }
     if (res.ok) {
       const duration = Date.now() - startTime;
-      const wasOffline = !ollamaOnline;
-      ollamaOnline = true;
+      const wasOffline = !aiOnline;
+      aiOnline = true;
       if (wasOffline && lastBridgeState === false && typeof sendNotification === 'function') {
         sendNotification(`Cognitive bridge ONLINE. Motore AI (${providerName}) pronto.`, 'success', 3000);
       }
@@ -199,8 +199,8 @@ async function checkOllamaBridge() {
       systemBridgeStatus.style.color = 'var(--accent-cyan)';
       systemBridgeStatus.style.textShadow = '0 0 10px var(--accent-cyan-glow)';
 
-      if (ollamaStatusDot) ollamaStatusDot.className = 'item-status online';
-      if (ollamaStatusText) ollamaStatusText.textContent = `status: ${providerName.toLowerCase()} active`;
+      if (aiStatusDot) aiStatusDot.className = 'item-status online';
+      if (aiStatusText) aiStatusText.textContent = `status: ${providerName.toLowerCase()} active`;
 
       if (svcCognitive) {
         setServiceStatus(svcCognitive, 'online');
@@ -228,7 +228,7 @@ async function checkOllamaBridge() {
       throw new Error(`Bridge responded with status ${res.status}`);
     }
   } catch (error) {
-    ollamaOnline = false;
+    aiOnline = false;
     if (lastBridgeState !== false) {
       if (typeof sendNotification === 'function') sendNotification(`Cognitive bridge OFFLINE. ${providerName} non raggiungibile.`, 'error', 8000);
     }
@@ -236,8 +236,8 @@ async function checkOllamaBridge() {
     systemBridgeStatus.style.color = 'var(--accent-red)';
     systemBridgeStatus.style.textShadow = '0 0 10px var(--accent-red-glow)';
 
-    if (ollamaStatusDot) ollamaStatusDot.className = 'item-status offline';
-    if (ollamaStatusText) ollamaStatusText.textContent = 'status: disconnected';
+    if (aiStatusDot) aiStatusDot.className = 'item-status offline';
+    if (aiStatusText) aiStatusText.textContent = 'status: disconnected';
 
     if (svcCognitive) {
       setServiceStatus(svcCognitive, 'offline');
@@ -258,12 +258,12 @@ async function checkOllamaBridge() {
   }
 }
 
-// Reduced from 1000ms: Ollama is already running after facial login, no need to wait long
-setTimeout(checkOllamaBridge, 200);
-setInterval(checkOllamaBridge, 8000);
+// Reduced from 1000ms: AI bridge is already running after facial login, no need to wait long
+setTimeout(checkAiBridge, 200);
+setInterval(checkAiBridge, 8000);
 
 // Benvenuto immediato: parte subito all'avvio, senza aspettare il primo ping
-// del ponte. Se Ollama è lento o offline, scatta il saluto locale (vedi sotto).
+// del ponte. Se il bridge è lento o offline, scatta il saluto locale (vedi sotto).
 if (!welcomeSent) setTimeout(() => { sendWelcomeMessage(); }, 100);
 
 // Carica config persistita + popola il selettore modelli all'avvio
@@ -272,7 +272,7 @@ loadRuntimeConfig().then(() => {
   applyModelToUI();
 });
 
-// Funzione unificata per streaming chat (OpenRouter / OpenCode Zen SSE / Ollama JSON lines)
+// Funzione unificata per streaming chat (OpenRouter / OpenCode Zen SSE / Local JSON lines)
 async function streamAiChatCompletion({ messages, onToken, signal }) {
   const isOpenRouter = (typeof aiProvider !== 'undefined' && aiProvider === 'openrouter');
   const isOpenCode = (typeof aiProvider !== 'undefined' && aiProvider === 'opencode');
@@ -365,8 +365,8 @@ async function streamAiChatCompletion({ messages, onToken, signal }) {
     }
 
   } else {
-    // Ollama streaming
-    const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
+    // Local AI streaming
+    const response = await fetch(`${LOCAL_AI_HOST}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -553,7 +553,7 @@ terminalForm.addEventListener('submit', async (e) => {
   typingIndicator.classList.remove('hidden');
   terminalLogs.scrollTop = terminalLogs.scrollHeight;
 
-  if (ollamaOnline) {
+  if (aiOnline) {
     try {
       // Route to specialist agent
       const agentId = await routeQuery(query);
@@ -653,10 +653,10 @@ terminalForm.addEventListener('submit', async (e) => {
 
       appendLogMessage('sys_err',
         `COGNITIVE BRIDGE UNREACHABLE.<br><br>` +
-        `Connection to Ollama on <span style="color:var(--accent-cyan); font-weight:bold;">${OLLAMA_HOST}</span> failed.<br>` +
-        `Please verify that the Ollama service is active and the model is pulled.<br><br>` +
-        `Initialize the cognitive core by executing the following in your shell:<br>` +
-        `<span class="ollama-command-hint">ollama run llama3</span>`,
+        `Connection to AI provider on <span style="color:var(--accent-cyan); font-weight:bold;">${LOCAL_AI_HOST}</span> failed.<br>` +
+        `Please verify that the AI service is active and the model is available.<br><br>` +
+        `Initialize the cognitive core by checking your AI provider configuration.<br>` +
+        `<span class="ai-command-hint">Check AI provider settings</span>`,
         'error'
       );
 

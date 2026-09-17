@@ -16,7 +16,7 @@
     '[SYS] S.A.V.I.A COGNITIVE CORE v4.0.0',
     '[SYS] Inizializzazione moduli neurali...',
     '[SYS] Calibrazione arc reactor...',
-    '[NET] Collegamento ponte Ollama...',
+    '[NET] Collegamento ponte AI...',
     '[SEC] Verifica identità operatore...',
     '[SYS] Sincronizzazione memoria contestuale...',
     '[SYS] All systems nominal. Benvenuto.'

@@ -74,7 +74,7 @@ const TOOL_PAGES = new Set([
 ]);
 
 // ============================================================
-// SERVICE: CALL HOTLINE (Twilio → tunnel → STT → Ollama → TTS)
+// SERVICE: CALL HOTLINE (Twilio → tunnel → STT → AI → TTS)
 // ============================================================
 const hotlineCacheDir = path.join(app.getPath('userData'), 'hf-cache');
 
@@ -126,7 +126,7 @@ ipcMain.handle('call-hotline-config', (event, patch) => {
 
 ipcMain.handle('call-hotline-brain', (event, brain) => {
   callServer.setConfig({
-    brainHost: (brain && brain.ollamaHost) || 'http://localhost:11434',
+    brainHost: (brain && brain.aiHost) || 'http://localhost:11434',
     brainModel: (brain && brain.model) || 'mistral',
     brainSystemPrompt: (brain && brain.systemPrompt) || null
   });

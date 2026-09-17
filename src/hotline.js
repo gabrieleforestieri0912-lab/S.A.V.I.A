@@ -183,7 +183,7 @@ function pushBrain() {
   const model = (typeof getActiveModel === 'function') ? getActiveModel() : null;
   const systemPrompt = (typeof getAgentPrompt === 'function') ? getAgentPrompt() : null;
   if (window.electronAPI?.callHotlineBrain && model) {
-    window.electronAPI.callHotlineBrain({ model, systemPrompt, ollamaHost: 'http://localhost:11434' });
+    window.electronAPI.callHotlineBrain({ model, systemPrompt, aiHost: 'http://localhost:11434' });
   }
 }
 

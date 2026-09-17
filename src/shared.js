@@ -1,8 +1,8 @@
 let soundEnabled = true;
 let overclockEnabled = true;
 let scanlinesEnabled = true;
-let ollamaOnline = false;
-let aiProvider = 'openrouter'; // 'openrouter' | 'opencode' | 'ollama'
+let aiOnline = false;
+let aiProvider = 'openrouter'; // 'openrouter' | 'opencode' | 'local'
 let openrouterApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
 let openrouterBaseUrl = 'https://openrouter.ai/api/v1';
 let opencodeApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
@@ -99,11 +99,11 @@ function addTickerEvent(prefix, msg) {
   }
 
   prefix = prefix.toLowerCase();
-  if (prefix === 'ai' || prefix === 'ollama_bridge') {
-    prefix = 'ollama';
+  if (prefix === 'ai' || prefix === 'cognitive' || prefix === 'cognitive_bridge') {
+    prefix = 'ai';
   } else if (prefix === 'sys_err' || prefix === 'error' || prefix === 'warning') {
     prefix = 'warn';
-  } else if (prefix !== 'sys' && prefix !== 'particles' && prefix !== 'ollama' && prefix !== 'warn') {
+  } else if (prefix !== 'sys' && prefix !== 'particles' && prefix !== 'ai' && prefix !== 'warn') {
     prefix = 'sys';
   }
 
@@ -244,7 +244,7 @@ async function initSystemInfo() {
 
     if (svcCognitive) {
       const desc = svcCognitive.querySelector('.item-desc');
-      if (desc) desc.textContent = 'Llama3 Bridge Initializing...';
+      if (desc) desc.textContent = 'AI Bridge Initializing...';
     }
   } catch(e) {
     addTickerEvent('warn', `System info query failed: ${e.message}`);
@@ -320,7 +320,7 @@ if (svcTelemetry) {
 
 if (svcCognitive) {
   svcCognitive.style.cursor = 'default';
-  svcCognitive.title = 'Cognitive Core — status mirrors Ollama bridge';
+  svcCognitive.title = 'Cognitive Core — status mirrors AI bridge';
 }
 
 initSystemInfo();
