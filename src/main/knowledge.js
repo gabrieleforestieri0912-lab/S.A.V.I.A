@@ -89,22 +89,24 @@ function extractTextFromFile(filepath) {
   const ext = path.extname(filepath).toLowerCase();
   if (ext === '.pdf') {
     try {
-      const out = execSync(
-        `powershell -NoProfile -Command "try { $p = \"${filepath.replace(/'/g, "''")}\"; Add-Type -AssemblyName System.Speech; $speak = New-Object System.Speech.Synthesis.SpeechSynthesizer; Write-Output 'PDF extraction requires additional libraries' } catch { Write-Output 'PDF extraction unavailable' }"`,
-        { windowsHide: true, timeout: 5000, encoding: 'utf-8' }
-      ).trim();
-      return out || '[PDF extraction not available]';
-    } catch { return '[PDF extraction failed]'; }
+      const pdfParse = require('pdf-parse');
+      const buf = fs.readFileSync(filepath);
+      // pdf-parse è async ma offriamo sync via deasync-like: usa versione sync con require
+      // fallback: ritorna placeholder per indicizzazione async (gestita in indexFile)
+      return `[PDF:${path.basename(filepath)}:${buf.length}bytes:use-async]`;
+    } catch (e) {
+      return `[PDF extraction failed: ${e.message}]`;
+    }
   }
 
   if (ext === '.docx') {
     try {
-      const out = execSync(
-        `powershell -NoProfile -Command "try { $p = \"${filepath.replace(/'/g, "''")}\"; $o = New-Object -ComObject Word.Application; $o.Visible = $false; $d = $o.Documents.Open($p); $t = $d.Content.Text; $d.Close(); $o.Quit(); Write-Output $t } catch { Write-Output 'DOCX extraction failed: $($_.Exception.Message)' }"`,
-        { windowsHide: true, timeout: 10000, encoding: 'utf-8' }
-      ).trim();
-      return out || '[DOCX extraction failed]';
-    } catch { return '[DOCX extraction failed]'; }
+      const mammoth = require('mammoth');
+      const buf = fs.readFileSync(filepath);
+      return `[DOCX:${path.basename(filepath)}:${buf.length}bytes:use-async]`;
+    } catch (e) {
+      return `[DOCX extraction failed: ${e.message}]`;
+    }
   }
 
   if (TEXT_EXTS.has(ext)) {
@@ -113,12 +115,37 @@ function extractTextFromFile(filepath) {
   return null;
 }
 
+async function extractTextAsync(filepath) {
+  const ext = path.extname(filepath).toLowerCase();
+  if (ext === '.pdf') {
+    try {
+      const pdfParse = require('pdf-parse');
+      const buf = fs.readFileSync(filepath);
+      const data = await pdfParse(buf);
+      return (data.text || '').trim() || '[PDF vuoto]';
+    } catch (e) {
+      return `[PDF extraction failed: ${e.message}]`;
+    }
+  }
+  if (ext === '.docx') {
+    try {
+      const mammoth = require('mammoth');
+      const result = await mammoth.extractRawText({ path: filepath });
+      return (result.value || '').trim() || '[DOCX vuoto]';
+    } catch (e) {
+      return `[DOCX extraction failed: ${e.message}]`;
+    }
+  }
+  return extractTextFromFile(filepath);
+}
+
 async function indexFile(filePath) {
   if (!fs.existsSync(filePath)) return { success: false, error: 'File not found' };
   const stat = fs.statSync(filePath);
   if (stat.size > 50 * 1024 * 1024) return { success: false, error: 'File > 50MB' };
 
-  const text = extractTextFromFile(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const text = (ext === '.pdf' || ext === '.docx') ? await extractTextAsync(filePath) : extractTextFromFile(filePath);
   if (!text) return { success: false, error: 'Unsupported file type' };
 
   const kb = loadKB();
@@ -175,7 +202,8 @@ async function indexDirectory(dirPath) {
       const sig = `${f}|${stat.size}|${stat.mtimeMs}`;
       if (sigs.has(sig)) { processed.skipped++; continue; }
 
-      const text = extractTextFromFile(f);
+      const ext2 = path.extname(f).toLowerCase();
+      const text = (ext2 === '.pdf' || ext2 === '.docx') ? await extractTextAsync(f) : extractTextFromFile(f);
       if (!text) { processed.skipped++; continue; }
 
       const docId = 'doc_' + Date.now() + '_' + path.basename(f).replace(/[^a-zA-Z0-9_\-.]/g, '_');

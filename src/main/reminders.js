@@ -6,23 +6,48 @@
 
 const agentStore = require('./agent-store');
 const notify = require('./notify');
+let chrono = null;
+try { chrono = require('chrono-node'); } catch (_) {}
 
 let sendToAll = () => {};
 
 function parseDueDate(dateStr, timeStr) {
+  // 1) NLU con chrono-node per espressioni naturali ("domani alle 15", "tra 2 ore", "venerdì")
+  if (chrono) {
+    const raw = [dateStr, timeStr].filter(Boolean).join(' ').trim();
+    if (raw && /[a-zA-Zà-ù]|tra |domani|dopodomani|oggi|ieri|luned|marted|mercoled|gioved|venerd|sabad|domenic/i.test(raw)) {
+      try {
+        const parsed = chrono.it ? chrono.it.parseDate(raw, new Date(), { forwardDate: true }) : chrono.parseDate(raw, new Date(), { forwardDate: true });
+        if (parsed && !isNaN(parsed.getTime())) return parsed;
+      } catch (_) {}
+    }
+  }
+  // 2) Fallback formato strutturato YYYY-MM-DD + HH:MM
   if (!dateStr && !timeStr) return null;
   const today = new Date();
   let y, m, d, hh, mm;
 
   if (dateStr) {
-    const parts = dateStr.split('-');
-    if (parts.length !== 3) return null;
-    y = parseInt(parts[0]); m = parseInt(parts[1]) - 1; d = parseInt(parts[2]);
+    // accetta anche "15/09/2026" o "15-09-2026"
+    const norm = String(dateStr).trim();
+    const iso = norm.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    const eur = norm.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+    const eur2 = norm.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (iso) { y = parseInt(iso[1]); m = parseInt(iso[2]) - 1; d = parseInt(iso[3]); }
+    else if (eur) { d = parseInt(eur[1]); m = parseInt(eur[2]) - 1; y = parseInt(eur[3]); }
+    else if (eur2) { d = parseInt(eur2[1]); m = parseInt(eur2[2]) - 1; y = parseInt(eur2[3]); }
+    else {
+      const parts = norm.split('-');
+      if (parts.length !== 3) return null;
+      y = parseInt(parts[0]); m = parseInt(parts[1]) - 1; d = parseInt(parts[2]);
+    }
   } else { y = today.getFullYear(); m = today.getMonth(); d = today.getDate(); }
 
-  if (timeStr && timeStr.includes(':')) {
-    const tp = timeStr.split(':');
+  if (timeStr && String(timeStr).includes(':')) {
+    const tp = String(timeStr).split(':');
     hh = parseInt(tp[0]); mm = parseInt(tp[1]);
+  } else if (timeStr && /^\d{1,2}$/.test(String(timeStr).trim())) {
+    hh = parseInt(timeStr); mm = 0;
   } else { hh = 9; mm = 0; }
 
   const due = new Date(y, m, d, hh, mm, 0);

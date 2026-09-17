@@ -280,32 +280,103 @@ function parseAgentTools(text) {
   return null;
 }
 
-// Web search tool (renderer-side)
+// Web search tool (renderer-side) — REALE: Brave API (se configurato) → DDG HTML scraping fallback
 async function executeWebSearch(query) {
+  const q = query.trim();
+  if (!q) return 'No query.';
+  // 1) Brave Search se chiave disponibile in config (savia-config.json -> braveApiKey)
   try {
-    const res = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
-    if (!res.ok) throw new Error('DuckDuckGo API error');
-    const data = await res.json();
-    let results = [];
-    if (data.RelatedTopics) {
-      for (const t of data.RelatedTopics) {
-        if (t.Text) results.push(t.Text);
-        if (t.Topics) t.Topics.forEach(s => { if (s.Text) results.push(s.Text); });
+    let braveKey = '';
+    try {
+      if (window.electronAPI && window.electronAPI.configGet) {
+        const cfg = await window.electronAPI.configGet();
+        braveKey = (cfg && cfg.braveApiKey) || '';
+      }
+    } catch (_) {}
+    if (braveKey) {
+      const res = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&count=8`, {
+        headers: { 'X-Subscription-Token': braveKey, 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = (data.web && data.web.results) || [];
+        if (items.length) {
+          return items.map(r => `[${r.title}](${r.url})\n${r.description || ''}`.trim()).join('\n\n');
+        }
       }
     }
-    if (data.AbstractText) results.unshift(data.AbstractText);
-    return results.slice(0, 8).join('\n') || 'No results found.';
+  } catch (_) { /* fallback sotto */ }
+
+  // 2) Fallback REALE senza API key: DuckDuckGo HTML (parsing leggero, no Instant Answer)
+  try {
+    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (!res.ok) throw new Error(`DDG HTML ${res.status}`);
+    const html = await res.text();
+    const results = [];
+    // Estrae risultati DDG HTML: <a class="result__url" href="..."> + snippet
+    const re = /<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>(.*?)<\/a>/gi;
+    let m;
+    while ((m = re.exec(html)) && results.length < 8) {
+      const url = m[1].startsWith('//') ? 'https:' + m[1] : m[1];
+      const title = m[2].replace(/<[^>]+>/g, '').trim();
+      const snippet = m[3].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (title && url) results.push(`[${title}](${url})\n${snippet}`);
+    }
+    if (results.length) return results.join('\n\n');
+    // fallback ulteriore: Instant Answer se HTML vuoto
+    const ia = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1`);
+    if (ia.ok) {
+      const data = await ia.json();
+      let iaResults = [];
+      if (data.AbstractText) iaResults.push(data.AbstractText);
+      if (data.RelatedTopics) for (const t of data.RelatedTopics) {
+        if (t.Text) iaResults.push(t.Text);
+        if (t.Topics) t.Topics.forEach(s => { if (s.Text) iaResults.push(s.Text); });
+      }
+      if (iaResults.length) return iaResults.slice(0, 8).join('\n');
+    }
+    return 'No results found.';
   } catch (e) {
     return `[SEARCH ERROR] ${e.message}`;
   }
 }
 
 async function executeWebFetch(url) {
+  const target = String(url || '').trim();
+  if (!target) return '[FETCH ERROR] no url';
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 10000);
+    const res = await fetch(target, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (S.A.V.I.A; HUD)' },
+      signal: ctrl.signal
+    });
+    clearTimeout(to);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (ct.includes('application/pdf')) return `[FETCH] PDF non leggibile direttamente — scarica il file e indicizzalo nella Knowledge Base.`;
     const text = await res.text();
-    const cleaned = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    return cleaned.substring(0, 3000);
+    // Estrattore REALE: preferisci <article>/<main>, rimuovi script/style/nav
+    let cleaned = text
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+      .replace(/<header[\s\S]*?<\/header>/gi, ' ')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, ' ');
+    // prova a isolare articolo
+    const art = cleaned.match(/<article[\s\S]*?<\/article>/i);
+    const main = cleaned.match(/<main[\s\S]*?<\/main>/i);
+    if (art) cleaned = art[0];
+    else if (main) cleaned = main[0];
+    cleaned = cleaned.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    // Tronca intelligente a ~6000 char preservando frasi
+    if (cleaned.length > 6000) {
+      const cut = cleaned.lastIndexOf('.', 6000);
+      cleaned = (cut > 4000 ? cleaned.slice(0, cut + 1) : cleaned.slice(0, 6000)) + '…';
+    }
+    return cleaned || '[FETCH] contenuto vuoto';
   } catch (e) {
     return `[FETCH ERROR] ${e.message}`;
   }
@@ -350,9 +421,26 @@ async function executeAgentTool(text) {
       appendLogMessage('tool', `[KB SEARCH] "${cmd.args}"`, 'tool');
       return resultText;
     }
-    case 'imagine':
-      appendLogMessage('tool', `[IMAGINE] Generated prompt: "${cmd.args}"`, 'tool');
-      return `Prompt for image generation: "${cmd.args}"`;
+    case 'imagine': {
+      // REALE: genera immagine via Pollinations.ai (stessa API di imagine.js), ritorna URL
+      const prompt = String(cmd.args || '').trim();
+      if (!prompt) return '[IMAGINE ERROR] prompt vuoto';
+      try {
+        const encoded = encodeURIComponent(prompt);
+        // modello default flux, 1024x1024
+        const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&seed=${Date.now()}`;
+        appendLogMessage('tool', `[IMAGINE] Generazione: "${prompt.substring(0,120)}" → ${url}`, 'tool');
+        // verifica raggiungibilità (fetch HEAD) — se fallisce ritorna comunque URL (Pollinations è on-demand)
+        try {
+          const h = await fetch(url, { method: 'HEAD' });
+          if (!h.ok) throw new Error(`HTTP ${h.status}`);
+        } catch (_) { /* ignora, URL resta valido */ }
+        addTickerEvent('agent', `Immagine generata: ${prompt.substring(0,40)}...`);
+        return `✅ Immagine generata (Pollinations flux 1024x1024):\nURL: ${url}\nPrompt: "${prompt}"\nApri l'URL per vedere/scaricare l'immagine.`;
+      } catch (e) {
+        return `[IMAGINE ERROR] ${e.message}`;
+      }
+    }
     case 'notify':
       if (typeof sendNotification === 'function') {
         const parts = cmd.args.split('|').map(s => s.trim());
