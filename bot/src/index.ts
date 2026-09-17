@@ -12,7 +12,7 @@ import { healthMonitor, redactSecrets } from "./healthMonitor.js";
 import { handleSelfHeal, getSelfHealState, resetSelfHeal } from "./selfHeal.js";
 import { handleManagedHeal } from "./managedHeal.js";
 
-const LOGO_PATH = path.resolve(process.cwd(), "..", "savia.png");
+const LOGO_PATH = path.resolve(process.cwd(), "..", "public", "savia.png");
 
 function validateConfig(): void {
   const missing: string[] = [];

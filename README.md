@@ -72,7 +72,8 @@ S.A.V.I.A/
 ├── package.json              # Metadati progetto, entry point Electron
 ├── main.js                   # Processo principale Electron (2236 righe)
 ├── preload.js                # Ponte IPC contextBridge (187 righe)
-├── savia.png                 # Icona dell'app
+├── public/
+│   └── savia.png             # Icona dell'app
 │
 ├── src/
 │   ├── index.html            # HUD principale — Terminale Cognitivo + Dashboard

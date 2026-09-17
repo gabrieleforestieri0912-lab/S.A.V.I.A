@@ -288,7 +288,7 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 700,
     frame: false,
-    icon: path.join(__dirname, 'savia.png'),
+    icon: path.join(__dirname, 'public', 'savia.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -374,7 +374,7 @@ ipcMain.handle('open-tool-page', (event, page) => {
     minWidth: 1000,
     minHeight: 700,
     frame: false,
-    icon: path.join(__dirname, 'savia.png'),
+    icon: path.join(__dirname, 'public', 'savia.png'),
     backgroundColor: '#070913',
     show: false,
     webPreferences: {
@@ -433,7 +433,7 @@ function openEditorWindow(filePath) {
     minWidth: 1000,
     minHeight: 700,
     frame: false,
-    icon: path.join(__dirname, 'savia.png'),
+    icon: path.join(__dirname, 'public', 'savia.png'),
     backgroundColor: '#070913',
     show: false,
     webPreferences: {
@@ -507,7 +507,7 @@ function buildTrayMenu() {
 
 function setupTray() {
   try {
-    const iconPath = path.join(__dirname, 'savia.png');
+    const iconPath = path.join(__dirname, 'public', 'savia.png');
     let icon;
     if (fs.existsSync(iconPath)) {
       icon = nativeImage.createFromPath(iconPath);

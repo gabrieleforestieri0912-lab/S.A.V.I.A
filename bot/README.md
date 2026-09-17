@@ -255,7 +255,7 @@ Verifica boot: riavvia PC → `pm2 list` deve mostrare `savia-bot` online senza 
 
 ## Note
 - Il bot risponde **solo** al `ALLOWED_CHAT_ID` configurato; gli altri messaggi sono ignorati.
-- Ogni risposta utile include l'immagine `savia.png` (alla radice del repo, `../savia.png`
+- Ogni risposta utile include l'immagine `public/savia.png` (`../public/savia.png`
   rispetto alla cartella `bot/`) inviata come foto con il testo in didascalia.
 - I secret vivono in `.env.local` (mai committato). `.env.example` è solo un template.
 - In caso di errore il bot risponde con un messaggio leggibile e non crasha.
