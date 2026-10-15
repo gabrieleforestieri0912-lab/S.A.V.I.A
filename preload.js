@@ -207,25 +207,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // ============================================================
-  // PROXIMITY (BLE RSSI + ADB auto-unlock)
-  // ============================================================
-  proximityStatus: () => ipcRenderer.invoke('proximity-status'),
-  proximityStart: () => ipcRenderer.invoke('proximity-start'),
-  proximityStop: () => ipcRenderer.invoke('proximity-stop'),
-  proximityConfig: (patch) => ipcRenderer.invoke('proximity-config', patch),
-  proximityAddDevice: (dev) => ipcRenderer.invoke('proximity-add-device', dev),
-  proximityRemoveDevice: (mac) => ipcRenderer.invoke('proximity-remove-device', mac),
-  proximityPair: (hostPort, code) => ipcRenderer.invoke('proximity-pair', { hostPort, code }),
-  proximityConnect: (hostPort) => ipcRenderer.invoke('proximity-connect', hostPort),
-  proximityTestAdb: (hostPort) => ipcRenderer.invoke('proximity-test-adb', hostPort),
-  proximityUnlockNow: (mac) => ipcRenderer.invoke('proximity-unlock-now', mac),
-  proximityInstallDeps: () => ipcRenderer.invoke('proximity-install-deps'),
-  proximityInstallAdb: () => ipcRenderer.invoke('proximity-install-adb'),
-  onProximityEvent: (callback) => {
-    ipcRenderer.on('proximity-event', (event, data) => callback(data));
-  },
-
-  // ============================================================
   // LOGIN & EDITOR
   // ============================================================
   loginSuccess: () => ipcRenderer.send('login-success'),

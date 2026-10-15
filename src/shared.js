@@ -405,17 +405,15 @@ const NAV_HISTORY = [];
 const NAV_PAGES = {
   'index.html':       { title: 'Chat', section: 'view-terminal', icon: 'fa-brain' },
   'editor':           { title: 'Editor', section: 'view-editor', icon: 'fa-code' },
-  'calendar.html':    { title: 'Calendario', external: true },
-  'particles.html':   { title: 'Particelle', external: true },
   'terminal.html':    { title: 'Terminale', external: true },
   'globe.html':       { title: 'Mondo', external: true },
   'knowledge.html':   { title: 'Conoscenza', external: true },
-  'mcp.html':         { title: 'Server MCP', external: true },
+  'news.html':        { title: 'Notizie', external: true },
 };
 
 // True quando la pagina corrente vive in una finestra-strumento dedicata
 // (in tal caso "index.html" deve riportare al centro di comando, non cambiare vista)
-const IS_TOOL_WINDOW = /(?:terminal|calendar|particles|globe|knowledge|hotline|proximity|face-training|mcp)\.html$/.test(location.pathname);
+const IS_TOOL_WINDOW = /(?:terminal|globe|knowledge|face-training)\.html$/.test(location.pathname);
 
 let navReady = false;
 let currentNavPage = null;
@@ -477,9 +475,8 @@ function updateSidebarActive(pageId) {
   const map = {
     'index.html': ['proj-saviacore'],
     'editor':     ['nav-editor'],
-    'calendar.html': [],
-    'particles.html': [], 'terminal.html': [], 'globe.html': [],
-    'knowledge.html': [],
+    'terminal.html': [], 'globe.html': [],
+    'knowledge.html': [], 'news.html': [],
   };
   const ids = map[pageId] || [];
   document.querySelectorAll('#left-sidebar .nav-rail-item').forEach(function(el) {

@@ -11,7 +11,6 @@ const path = require('path');
 const fs = require('fs');
 
 const callServer = require('./src/call-server');
-const proximity = require('./src/proximity-engine');
 const mcpServers = require('./src/mcp-servers');
 const notify = require('./src/main/notify');
 const telemetry = require('./src/main/telemetry');
@@ -67,9 +66,9 @@ function sendToAll(channel, payload) {
 }
 
 const TOOL_PAGES = new Set([
-  'terminal.html', 'calendar.html',
-  'particles.html', 'globe.html', 'knowledge.html',
-  'hotline.html', 'proximity.html', 'face-training.html', 'mcp.html',
+  'terminal.html',
+  'globe.html', 'knowledge.html',
+  'face-training.html',
   'news.html', 'editor.html', 'stats.html'
 ]);
 
@@ -160,53 +159,6 @@ ipcMain.handle('stt-transcribe', async (event, pcm16) => {
     return { ok: false, error: (e && e.message) || String(e) };
   }
 });
-
-// ============================================================
-// SERVICE: PROXIMITY (BLE RSSI + ADB auto-unlock)
-// ============================================================
-function proximityApplyConfig() {
-  const cfg = loadConfig();
-  proximity.setConfig({
-    pythonPath: cfg.proximityPythonPath || '',
-    adbPath: cfg.proximityAdbPath || '',
-    threshold: typeof cfg.proximityThreshold === 'number' ? cfg.proximityThreshold : -65,
-    cooldownSec: cfg.proximityCooldownSec || 60,
-    checkInterval: cfg.proximityCheckInterval || 3000,
-    devices: cfg.proximityDevices || []
-  });
-}
-
-proximity.setConfig({ pythonPath: '', adbPath: '' });
-proximity.setEventSink((type, payload) => {
-  sendToAll('proximity-event', { type, payload });
-});
-
-ipcMain.handle('proximity-status', async () => proximity.fullStatus());
-ipcMain.handle('proximity-start', async () => proximity.start());
-ipcMain.handle('proximity-stop', () => proximity.stop());
-ipcMain.handle('proximity-config', (event, patch) => {
-  if (patch) saveConfig(patch);
-  proximityApplyConfig();
-  return proximity.status();
-});
-ipcMain.handle('proximity-add-device', (event, dev) => {
-  const res = proximity.addDevice(dev);
-  proximity.setConfig({ devices: res.devices });
-  saveConfig({ proximityDevices: res.devices });
-  return proximity.status();
-});
-ipcMain.handle('proximity-remove-device', (event, mac) => {
-  const res = proximity.removeDevice(mac);
-  proximity.setConfig({ devices: res.devices });
-  saveConfig({ proximityDevices: res.devices });
-  return proximity.status();
-});
-ipcMain.handle('proximity-pair', (event, { hostPort, code }) => proximity.pair(hostPort, code));
-ipcMain.handle('proximity-connect', (event, hostPort) => proximity.connect(hostPort));
-ipcMain.handle('proximity-test-adb', (event, hostPort) => proximity.testAdb(hostPort));
-ipcMain.handle('proximity-unlock-now', (event, mac) => proximity.unlockNow(mac));
-ipcMain.handle('proximity-install-deps', () => proximity.installDeps());
-ipcMain.handle('proximity-install-adb', () => proximity.downloadPlatformTools());
 
 // ============================================================
 // SERVICE: MCP SERVERS (Model Context Protocol → Any App)
@@ -617,12 +569,6 @@ app.whenReady().then(() => {
     }, 3000);
   }
 
-  // Autostart proximity se abilitata in config
-  if (loadConfig().proximityEnabled) {
-    proximityApplyConfig();
-    setTimeout(() => { proximity.start(); }, 4000);
-  }
-
   // Autostart server MCP abilitati
   mcpServers.setConfig(loadConfig().mcpServers || []);
   setTimeout(() => { mcpServers.startAll(); }, 2500);
@@ -635,7 +581,6 @@ app.whenReady().then(() => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   callServer.stop();
-  proximity.stop();
   mcpServers.stopAll();
   for (const win of toolWindows.values()) {
     try { win.destroy(); } catch (e) { /* ignore */ }

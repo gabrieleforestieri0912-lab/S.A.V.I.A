@@ -219,7 +219,8 @@ function diffNewArticles(articles, cursor, windowHours) {
 // ============================================================
 
 function getWatchConfig() {
-  const base = { enabled: true, intervalMin: 10, speak: true, sources: NEWS_SOURCES.map(s => s.id) };
+  // Default SPENTO: niente avvisi finché l'utente non attiva il monitor dalla pagina Notizie
+  const base = { enabled: false, intervalMin: 10, speak: true, sources: NEWS_SOURCES.map(s => s.id) };
   try {
     const saved = JSON.parse(localStorage.getItem(NEWS_KEYS.watch) || '{}');
     return Object.assign(base, saved);

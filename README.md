@@ -34,7 +34,7 @@
 │  ┌───────────────────────────────────────────────────────────┐   │
 │  │ Servizi: Telemetry, File System, Terminal, Memoria,       │   │
 │  │ System Ops, RAG Pipeline, Agenti (calendar/todo/reminder), │   │
-│  │ Hotline, Proximity (BLE), MCP Servers                      │   │
+│  │ STT Whisper, MCP Servers                                   │   │
 │  └───────────────────────────────────────────────────────────┘   │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ IPC (contextBridge)
@@ -44,14 +44,14 @@
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────────┐   │
 │  │ Pagine: index.html  terminal.html  globe.html  knowledge.html         │   │
-│  │         particles.html  calendar.html  news.html  mcp.html               │   │
+│  │         news.html  face-training.html                           │   │
 │  └───────────────────────────────────────────────────────────┘   │
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────────┐   │
 │  │ Moduli Renderer:                                            │   │
 │  │ shared.js  agents.js  cognitive.js  telemetry.js            │   │
 │  │ memory.js  system-ops.js  voice-control.js                  │   │
-│  │ commander.js  knowledge-base.js  calendar.js                 │   │
+│  │ commander.js  knowledge-base.js                            │   │
 │  └───────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -77,12 +77,9 @@ S.A.V.I.A/
 ├── src/
 │   ├── index.html            # HUD principale — Chat + Editor
 │   ├── terminal.html         # Terminali PTY multi-tab con shell selezionabile
-│   ├── news.html             # News Feed Tech & AI + watchdog segnalazioni
-│   ├── calendar.html         # Calendario ed eventi (locale)
-│   ├── particles.html        # Motore 3D particelle neurali
+│   ├── news.html             # News Feed Tech & AI (watchdog disattivato di default)
 │   ├── globe.html            # Mappa mondiale 3D con meteo
 │   ├── knowledge.html        # Knowledge Base RAG
-│   ├── mcp.html              # Hub server MCP (Model Context Protocol)
 │   │
 │   ├── style.css             # Foglio di stile cyberpunk HUD (2700+ righe)
 │   │
@@ -96,9 +93,7 @@ S.A.V.I.A/
 │   ├── commander.js          # Terminali PTY multi-tab
 │   ├── knowledge-base.js     # Interfaccia RAG
 │   ├── globe.js              # Visualizzazione 3D Terra
-│   ├── particles.js          # Sistema particelle 3D
 │   ├── mcp-servers.js        # Servizio MCP (main process) — client SDK
-│   ├── mcp.js                # Controller pagina MCP (renderer)
 │   └── news.js               # Feed notizie + watchdog Tech/AI (condiviso index/news)
 ```
 
@@ -136,7 +131,7 @@ Il processo principale Electron. Crea la finestra, gestisce i servizi di sistema
 - **Eventi**: `status` e `tools` vengono inoltrati a tutta la UI via `mcp-event` (push) — la cache `window.MCP_TOOL_DOCS` in `cognitive.js` si aggiorna live.
 - **Config + autostart**: l'elenco server vive in `savia-config.json` (`mcpServers`); all'avvio di S.A.V.I.A vengono connessi automaticamente i server con `enabled: true`.
 - **Agent tool**: l'AI può chiamare qualunque tool MCP con `[TOOL] mcp:<serverId> <toolName> <json>` (vedi `parseAgentTools`).
-- **UI**: pagina `mcp.html` per aggiungere/modificare/rimuovere server, avviarli/fermarli e testarne i tool manualmente (JSON args + CALL).
+- **UI**: i server si configurano in `savia-config.json` (chiave `mcpServers`); i tool MCP restano utilizzabili dall'agente AI con `[TOOL] mcp:...`.
 
 ### Pipeline RAG (Knowledge Base)
 
@@ -202,12 +197,6 @@ shared.js → agents.js → cognitive.js → telemetry.js → memory.js
 - Salvataggio locale "per dopo" delle notizie
 - Comandi vocali/testo dall'index: `apri le notizie`, `ultime notizie`, `vai alle notizie`…
 
-### `particles.html` — Particelle Neurali
-
-- Three.js: forme sfera, ipercubo, galassia a spirale
-- Controlli: conteggio (1k-10k), dimensione, colori, rotazione
-- Gesture: movimento mano ruota, pinch scala, flick resetta
-
 ### `globe.html` — Mappa Mondiale 3D
 
 - Three.js: Terra texturizzata con atmosfera, nuvole, stelle
@@ -219,11 +208,7 @@ shared.js → agents.js → cognitive.js → telemetry.js → memory.js
 - Lista documenti indicizzati con eliminazione
 - Ricerca semantica con punteggio di similarità (cosine similarity)
 
-### `mcp.html` — MCP Servers (Connect Any App)
-
-- Pannello sinistro: form AGGIUNGI/MODIFICA server (nome, trasporto, comando/URL, args, env/headers JSON, auto-connect) + lista server configurati con stato, pulsanti CONNETTI/STOP/MODIFICA/RIMUOVI + log MCP
-- Pannello destro: **TOOL DISCOVERED** — tutti i tool dei server connessi, descrizione e runner di test (args JSON + CALL) con output inline
-- Accessibile dal nav rail di tutte le pagine (`MCP_SERVERS`), dal comando vocale e dall'agent (`navigate_mcp`)
+- **UI**: i tool MCP restano utilizzabili dall'agente AI con `[TOOL] mcp:...` (i server si configurano in `savia-config.json` → `mcpServers`).
 
 ---
 
@@ -386,12 +371,6 @@ IDLE → WAKE_LISTEN → "Hey SAVIA" → WAKE_HEARD
 - Camera zoom animata su città selezionata
 - MediaPipe: mano ruota globo, pinch zoom, puntamento seleziona città
 
-### `particles.js` — Particelle 3D
-
-- Three.js: 3 forme (Sfera, Ipercubo, Galassia)
-- Controlli: conteggio, dimensione, colori base/accento, rotazione
-- MediaPipe: mano ruota campo, pinch scala, flick resetta
-
 ---
 
 ## 7. Flusso AI
@@ -485,8 +464,8 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 | **ElevenLabs** | `api.elevenlabs.io/v1/text-to-speech/{voice}` | Text-to-speech | cognitive.js |
 | **DuckDuckGo** | `api.duckduckgo.com` | Instant answer search | agents.js |
 | **Open-Meteo** | `api.open-meteo.com/v1/forecast` | Meteo città | globe.js |
-| **MediaPipe** | CDN `@mediapipe/hands` | Riconoscimento mani | globe.js, particles.js |
-| **Three.js** | CDN r128 | Grafica 3D | globe.js, particles.js |
+| **MediaPipe** | CDN `@mediapipe/hands` | Riconoscimento mani | globe.js |
+| **Three.js** | `src/lib/three.min.js` (locale) | Grafica 3D | orb.js, globe.js |
 
 ---
 
@@ -503,7 +482,7 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 - **Modello AI selezionabile**: menu `AI MODEL` popolato da `/api/tags` — scegli il modello AI attivo (persistito in config).
 - **Config file**: `savia-config.json` (userData) per chiavi API e impostazioni — la chiave ElevenLabs non è più hardcoded nel codice.
 - **Saluto contestuale**: benvenuto JARVIS basato sull'ora del giorno (buongiorno/pomeriggio/sera) con fallback vocale locale.
-- Agenda unificata rimossa con la dashboard; eventi e promemoria restano nel calendario e scattano via scheduler con notifica.
+- Eventi e promemoria si gestiscono via chat/voce (agente ORGANIZZATORE) e scattano via scheduler con notifica.
 - **MCP Servers (Connect Any App)**: connessione a qualunque app/agent tramite Model Context Protocol (stdio / SSE / HTTP) con l'SDK ufficiale. Pagina `mcp.html` per gestire i server e testare i tool; i tool MCP diventano utilizzabili dall'agente AI con `[TOOL] mcp:...` e dai comandi vocali.
 - **STAND BY**: pausa/ripresa dell'azione in corso (generazione streaming + TTS) esattamente dal punto in cui era rimasta — via chat ("pausa"/"ricomincia"), pulsante HUD o API `saviaStandbyPause/Resume`.
 

@@ -6,7 +6,7 @@
  */
 
 // Pagine dove le azioni di messaggistica sono disponibili
-const MSG_PAGES = ['index.html', 'particles.html', 'terminal.html', 'knowledge.html', 'globe.html', 'calendar.html', 'face-training.html', 'hotline.html', 'proximity.html', 'mcp.html'];
+const MSG_PAGES = ['index.html', 'terminal.html', 'knowledge.html', 'globe.html', 'face-training.html', 'news.html', 'stats.html'];
 
 function getCurrentPage() {
   const p = window.location.pathname.split('/').pop();
@@ -17,12 +17,10 @@ let actionPayload = '';
 
 const ACTION_MAP = {
   // ── Navigation ──
-  navigate_index:        { el: null, fn: () => { window.saviaOpen('index.html'); }, pages: ['particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
-  navigate_particles:    { el: null, fn: () => { window.saviaOpen('particles.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
-  navigate_terminal:     { el: null, fn: () => { window.saviaOpen('terminal.html'); }, pages: ['index.html','particles.html','knowledge.html','globe.html','calendar.html'] },
-  navigate_knowledge:    { el: null, fn: () => { window.saviaOpen('knowledge.html'); }, pages: ['index.html','particles.html','terminal.html','globe.html','calendar.html'] },
-  navigate_globe:        { el: null, fn: () => { window.saviaOpen('globe.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','calendar.html'] },
-  navigate_calendar:     { el: null, fn: () => { window.saviaOpen('calendar.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html'] },
+  navigate_index:        { el: null, fn: () => { window.saviaOpen('index.html'); }, pages: ['terminal.html','knowledge.html','globe.html'] },
+  navigate_terminal:     { el: null, fn: () => { window.saviaOpen('terminal.html'); }, pages: ['index.html','knowledge.html','globe.html'] },
+  navigate_knowledge:    { el: null, fn: () => { window.saviaOpen('knowledge.html'); }, pages: ['index.html','terminal.html','globe.html'] },
+  navigate_globe:        { el: null, fn: () => { window.saviaOpen('globe.html'); }, pages: ['index.html','terminal.html','knowledge.html'] },
 
   // ── System toggles (via API globali: niente più bottoni in sidebar) ──
   toggle_overclock:      { el: null, fn: () => { window.saviaToggleOverclock && window.saviaToggleOverclock(); }, pages: ['index.html','terminal.html'] },
@@ -40,36 +38,17 @@ const ACTION_MAP = {
   toggle_globe_gestures: { el: 'btn-globe-gestures', fn: null, pages: ['globe.html'] },
   globe_city_back:       { el: 'btn-city-back', fn: null, pages: ['globe.html'] },
 
-  // ── Particles controls ──
-  toggle_particles_rotate:  { el: 'btn-autoRotate', fn: null, pages: ['particles.html'] },
-  toggle_particles_gestures: { el: 'btn-gestures', fn: null, pages: ['particles.html'] },
-  particles_set_count:   { el: 'particleCount', fn: null, pages: ['particles.html'] },
-  particles_set_shape:   { el: 'shapeSelect', fn: null, pages: ['particles.html'] },
-  particles_set_size:    { el: 'particleSize', fn: null, pages: ['particles.html'] },
-  particles_creation_mode: { el: 'btn-creation-mode', fn: null, pages: ['particles.html'] },
-  particles_physics:     { el: 'btn-physics', fn: null, pages: ['particles.html'] },
-  particles_wireframe:   { el: 'btn-wireframe', fn: null, pages: ['particles.html'] },
-  particles_reset_scene: { el: 'btn-reset-scene', fn: null, pages: ['particles.html'] },
-  particles_screenshot:  { el: 'btn-screenshot', fn: null, pages: ['particles.html'] },
-  particles_gesture_rotate: { el: 'btn-gesture-rotate', fn: null, pages: ['particles.html'] },
-  particles_gesture_create: { el: 'btn-gesture-create', fn: null, pages: ['particles.html'] },
-  particles_gesture_delete: { el: 'btn-gesture-delete', fn: null, pages: ['particles.html'] },
-  particles_gesture_move:   { el: 'btn-gesture-move', fn: null, pages: ['particles.html'] },
-
   // ── Knowledge base ──
   kb_index:              { el: 'kb-index-btn', fn: null, pages: ['knowledge.html'] },
 
   // ── Memory ──
   memory_scan_projects:  { el: 'mem-scan-btn', fn: null, pages: ['index.html'] },
 
-  navigate_face_training:{ el: null, fn: () => { window.saviaOpen('face-training.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
-  navigate_hotline:      { el: null, fn: () => { window.saviaOpen('hotline.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
-  navigate_proximity:    { el: null, fn: () => { window.saviaOpen('proximity.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
-  navigate_mcp:          { el: null, fn: () => { window.saviaOpen('mcp.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
-  navigate_news:         { el: null, fn: () => { window.saviaOpen('news.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html','face-training.html','hotline.html','proximity.html','mcp.html'] },
-  navigate_stats:        { el: null, fn: () => { window.saviaOpen('stats.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html','face-training.html','hotline.html','proximity.html','mcp.html','news.html'] },
+  navigate_face_training:{ el: null, fn: () => { window.saviaOpen('face-training.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html'] },
+  navigate_news:         { el: null, fn: () => { window.saviaOpen('news.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html','face-training.html'] },
+  navigate_stats:        { el: null, fn: () => { window.saviaOpen('stats.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html','face-training.html','news.html'] },
   // ── Logs ──
-  open_logs:             { el: 'system-logs-ticker', fn: null, pages: ['index.html','particles.html','terminal.html','globe.html','knowledge.html'] },
+  open_logs:             { el: 'system-logs-ticker', fn: null, pages: ['index.html','terminal.html','globe.html','knowledge.html'] },
 
   // ── Messaging ──
   send_whatsapp: { el: null, fn: () => {
@@ -123,9 +102,6 @@ const ACTION_KEYWORDS = {
   'vai alla home': 'navigate_index',
   'torna alla home': 'navigate_index',
   'apri la home': 'navigate_index',
-  'vai alle particelle': 'navigate_particles',
-  'apri le particelle': 'navigate_particles',
-  'mostra le particelle': 'navigate_particles',
   'vai al terminale': 'navigate_terminal',
   'apri il terminale': 'navigate_terminal',
   'vai al command center': 'navigate_terminal',
@@ -134,26 +110,10 @@ const ACTION_KEYWORDS = {
   'vai al globo': 'navigate_globe',
   'apri il globo': 'navigate_globe',
   'vai al global timeline': 'navigate_globe',
-  'vai al calendario': 'navigate_calendar',
-  'apri calendario': 'navigate_calendar',
-  'vai a calendar': 'navigate_calendar',
   'addestra il volto': 'navigate_face_training',
   'apri face training': 'navigate_face_training',
   'vai al face training': 'navigate_face_training',
   'addestramento facciale': 'navigate_face_training',
-  'vai alla hotline': 'navigate_hotline',
-  'apri la hotline': 'navigate_hotline',
-  'apri hotline': 'navigate_hotline',
-  'chiamata telefonica': 'navigate_hotline',
-  'vai alla prossimità': 'navigate_proximity',
-  'apri la prossimità': 'navigate_proximity',
-  'dispositivi vicini': 'navigate_proximity',
-  'sblocca telefono': 'navigate_proximity',
-  'vai alla pagina mcp': 'navigate_mcp',
-  'apri la pagina mcp': 'navigate_mcp',
-  'gestisci server mcp': 'navigate_mcp',
-  'server mcp': 'navigate_mcp',
-  'strumenti mcp': 'navigate_mcp',
 
   // News feed
   'apri le notizie': 'navigate_news',
@@ -202,27 +162,6 @@ const ACTION_KEYWORDS = {
   'mostra vista globale': 'globe_global_view',
   'attiva gesti globo': 'toggle_globe_gestures',
   'disattiva gesti globo': 'toggle_globe_gestures',
-
-  // Particles
-  'attiva rotazione particelle': 'toggle_particles_rotate',
-  'disattiva rotazione particelle': 'toggle_particles_rotate',
-  'attiva gesti particelle': 'toggle_particles_gestures',
-  'disattiva gesti particelle': 'toggle_particles_gestures',
-  'attiva modalita creazione': 'particles_creation_mode',
-  'disattiva modalita creazione': 'particles_creation_mode',
-  'crea particelle': 'particles_creation_mode',
-  'attiva fisica': 'particles_physics',
-  'disattiva fisica': 'particles_physics',
-  'attiva wireframe': 'particles_wireframe',
-  'disattiva wireframe': 'particles_wireframe',
-  'resetta scena': 'particles_reset_scene',
-  'reset scena': 'particles_reset_scene',
-  'cattura schermata': 'particles_screenshot',
-  'screenshot': 'particles_screenshot',
-  'modalita rotazione': 'particles_gesture_rotate',
-  'modalita creazione': 'particles_gesture_create',
-  'modalita elimina': 'particles_gesture_delete',
-  'modalita sposta': 'particles_gesture_move',
 
   // Knowledge base
   'indicizza directory': 'kb_index',
