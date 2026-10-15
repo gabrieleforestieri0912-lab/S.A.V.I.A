@@ -46,7 +46,7 @@ document.getElementById('btn-train') || document.getElementById('btnTrain')?.add
 });
 
 bypassBtn.addEventListener('click', () => {
-  setStatus('BYPASS MANUALE ATTIVATO', 'success');
+  setStatus('Accesso manuale', 'success');
   unlock();
 });
 
@@ -62,7 +62,7 @@ resetBtn?.addEventListener('click', () => {
   if (bypassSection.classList.contains('visible')) {
     bypassSection.classList.remove('visible');
   }
-  setStatus('PROFILO BIOMETRICO RESETTATO - POSIZIONA IL VOLTO', 'scanning');
+  setStatus('Profilo reimpostato: mostra il volto', 'scanning');
   setMatch(0);
   setSecurityLevel(0);
   if (currentDisplaySize && !isUnlocking) {
@@ -117,7 +117,7 @@ function startNoFaceTimer() {
   clearNoFaceTimer();
   noFaceTimer = setTimeout(() => {
     if (!isUnlocking) {
-      setStatus('ATTIVAZIONE BYPASS BIOMETRICO...', 'scanning');
+      setStatus('Accesso manuale...', 'scanning');
       showBypass();
     }
   }, BYPASS_TIMEOUT);
@@ -152,16 +152,16 @@ function startFaceScanning(displaySize) {
         const profile = FaceTraining.loadProfile();
 
         if (!profile) {
-          setStatus('PROFILO BIOMETRICO NON TROVATO - REGISTRAZIONE...', 'scanning');
+          setStatus('Nuovo profilo: registrazione...', 'scanning');
           setMatch(detection.detection.score);
           setSecurityLevel(detection.detection.score);
 
           canvasCtx.font = '12px Orbitron';
-          canvasCtx.fillStyle = 'rgba(0, 243, 255, 0.4)';
-          canvasCtx.shadowColor = 'rgba(0, 243, 255, 0.3)';
+          canvasCtx.fillStyle = 'rgba(255, 171, 46, 0.4)';
+          canvasCtx.shadowColor = 'rgba(255, 171, 46, 0.3)';
           canvasCtx.shadowBlur = 6;
           canvasCtx.textAlign = 'center';
-          canvasCtx.fillText('REGISTRAZIONE NUOVO VOLTO', displaySize.width / 2, 30);
+          canvasCtx.fillText('Registrazione volto', displaySize.width / 2, 30);
           canvasCtx.shadowBlur = 0;
 
           drawMatchRing(detection.detection.score, displaySize);
@@ -180,7 +180,7 @@ function startFaceScanning(displaySize) {
               updatedAt: now,
               quality: detection.detection.score
             });
-            setStatus('PROFILO BIOMETRICO REGISTRATO', 'success');
+            setStatus('Profilo registrato', 'success');
             setMatch(1);
             setSecurityLevel(1);
             setTimeout(unlock, 1500);
@@ -196,12 +196,12 @@ function startFaceScanning(displaySize) {
           drawMatchRing(confidence, displaySize);
 
           if (match) {
-            setStatus('VOLTO RICONOSCIUTO. AUTENTICAZIONE...', 'success');
+            setStatus('Volto riconosciuto...', 'success');
             clearInterval(scanInterval);
             setTimeout(unlock, 1000);
           } else {
             if (attemptsLeft > 0) {
-              setStatus(`ACCESSO NEGATO - DISTANZA: ${distance.toFixed(3)}`, 'error');
+              setStatus('Non riconosciuto, riprova', 'error');
               attemptsLeft--;
               renderAttempts();
 
@@ -210,14 +210,14 @@ function startFaceScanning(displaySize) {
               canvasCtx.shadowColor = 'rgba(255, 42, 95, 0.4)';
               canvasCtx.shadowBlur = 8;
               canvasCtx.textAlign = 'center';
-              canvasCtx.fillText('\u26D1 VOLTO SCONOSCIUTO', displaySize.width / 2, displaySize.height - 20);
+              canvasCtx.fillText('\u26D1 Volto sconosciuto', displaySize.width / 2, displaySize.height - 20);
               canvasCtx.shadowBlur = 0;
 
               if (attemptsLeft === 0) {
-                setStatus('TROPPI TENTATIVI. BLOCCATO.', 'error');
+                setStatus('Troppi tentativi, riprova più tardi.', 'error');
                 clearInterval(scanInterval);
                 setTimeout(() => {
-                  setStatus('BYPASS DI SICUREZZA', 'success');
+                  setStatus('Accesso manuale', 'success');
                   unlock();
                 }, 4000);
                 return;
@@ -227,7 +227,7 @@ function startFaceScanning(displaySize) {
 
               setTimeout(() => {
                 if (!isUnlocking) {
-                  setStatus('INQUADRA IL VISO NEL RILEVATORE', 'idle');
+                  setStatus('Mostra il volto alla camera', 'idle');
                 }
               }, 2000);
             }
@@ -236,8 +236,8 @@ function startFaceScanning(displaySize) {
       } else {
         canvasCtx.clearRect(0, 0, overlay.width, overlay.height);
         if (resetSection) resetSection.classList.remove('visible');
-        if (!isUnlocking && statusMsg.textContent !== 'INQUADRA IL VISO NEL RILEVATORE') {
-          setStatus('INQUADRA IL VISO NEL RILEVATORE', 'idle');
+        if (!isUnlocking && statusMsg.textContent !== 'Mostra il volto alla camera') {
+          setStatus('Mostra il volto alla camera', 'idle');
         }
       }
     } catch (e) {
@@ -256,7 +256,7 @@ function unlock() {
   if (animFrame) cancelAnimationFrame(animFrame);
   if (resetSection) resetSection.classList.remove('visible');
 
-  setStatus('ACCESSO CONSENTITO. BENTORNATO.', 'success');
+  setStatus('Bentornato.', 'success');
   setMatch(1);
   setSecurityLevel(1);
   securityLevel.style.color = '#00ff88';
@@ -290,18 +290,18 @@ function drawCyberBox(detection, displaySize) {
 
   ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-  const glow = 'rgba(0, 243, 255, 0.08)';
-  ctx.shadowColor = 'rgba(0, 243, 255, 0.3)';
+  const glow = 'rgba(255, 171, 46, 0.08)';
+  ctx.shadowColor = 'rgba(255, 171, 46, 0.3)';
   ctx.shadowBlur = 20;
-  ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
+  ctx.strokeStyle = 'rgba(255, 171, 46, 0.15)';
   ctx.lineWidth = 1;
   ctx.strokeRect(bx, by, bwidth, bheight);
   ctx.shadowBlur = 0;
 
   const cornerLen = Math.min(bwidth * 0.2, 30);
-  ctx.strokeStyle = 'rgba(0, 243, 255, 0.7)';
+  ctx.strokeStyle = 'rgba(255, 171, 46, 0.7)';
   ctx.lineWidth = 2;
-  ctx.shadowColor = 'rgba(0, 243, 255, 0.5)';
+  ctx.shadowColor = 'rgba(255, 171, 46, 0.5)';
   ctx.shadowBlur = 8;
 
   ctx.beginPath();
@@ -326,8 +326,8 @@ function drawLandmarks(landmarks, displaySize) {
     const alpha = 0.3 + (Math.sin(Date.now() / 200 + i) * 0.15);
     ctx.beginPath();
     ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(0, 243, 255, ${alpha})`;
-    ctx.shadowColor = 'rgba(0, 243, 255, 0.4)';
+    ctx.fillStyle = `rgba(255, 171, 46, ${alpha})`;
+    ctx.shadowColor = 'rgba(255, 171, 46, 0.4)';
     ctx.shadowBlur = 4;
     ctx.fill();
     ctx.shadowBlur = 0;
@@ -352,7 +352,7 @@ function drawMatchRing(confidence, displaySize) {
   ctx.arc(cx, cy, radius + 4, startAngle, endAngle);
   ctx.strokeStyle = confidence > 0.8 ? '#00ff88' : confidence > 0.5 ? 'var(--accent-gold)' : 'var(--accent-red)';
   ctx.lineWidth = 2;
-  ctx.shadowColor = confidence > 0.8 ? 'rgba(0,255,136,0.5)' : 'rgba(0,243,255,0.3)';
+  ctx.shadowColor = confidence > 0.8 ? 'rgba(0,255,136,0.5)' : 'rgba(255,171,46,0.3)';
   ctx.shadowBlur = 10;
   ctx.stroke();
   ctx.shadowBlur = 0;
@@ -360,22 +360,22 @@ function drawMatchRing(confidence, displaySize) {
 
 async function init() {
   try {
-    setStatus('CARICAMENTO RETI NEURALI...', 'idle');
+    setStatus('Caricamento...', 'idle');
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
     ]);
     modelsLoaded = true;
-    setStatus('ACCENSIONE SENSORI OTTICI...', 'idle');
+    setStatus('Accendo la camera...', 'idle');
     startVideo();
   } catch (error) {
     console.error(error);
-    setStatus('ERRORE MODELLI - BYPASS IN 3s', 'error');
+    setStatus('Modelli non disponibili, accesso manuale...', 'error');
     setMatch(0);
     clearNoFaceTimer();
     setTimeout(() => {
-      setStatus('BYPASS DI EMERGENZA', 'success');
+      setStatus('Accesso manuale', 'success');
       unlock();
     }, 3000);
   }
@@ -387,7 +387,7 @@ function startVideo() {
       video.srcObject = stream;
     })
     .catch(() => {
-      setStatus('NESSUNA VIDEOCAMERA - BYPASS IN 3s', 'error');
+      setStatus('Nessuna camera, accesso manuale...', 'error');
       clearNoFaceTimer();
       setTimeout(unlock, 3000);
     });
@@ -396,7 +396,7 @@ function startVideo() {
 video.addEventListener('play', () => {
   if (!modelsLoaded) return;
 
-  setStatus('INQUADRA IL VISO NEL RILEVATORE', 'idle');
+  setStatus('Mostra il volto alla camera', 'idle');
 
   overlay.width = video.clientWidth || 480;
   overlay.height = video.clientHeight || 360;

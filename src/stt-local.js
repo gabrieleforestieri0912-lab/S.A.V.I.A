@@ -171,8 +171,11 @@
       stream = null;
     }
     running = false;
+    transcribing = false;
     resetState();
   }
 
-  window.LocalSTT = { supported, ensureModel, start, stop };
+  function isRunning() { return running; }
+
+  window.LocalSTT = { supported, ensureModel, start, stop, isRunning };
 })();

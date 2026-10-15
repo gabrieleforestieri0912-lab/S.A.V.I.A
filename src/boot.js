@@ -83,7 +83,7 @@
       appendBootLine(BOOT_LINES[lineIdx]);
       setProgress(Math.round(((lineIdx + 1) / BOOT_LINES.length) * 100));
       lineIdx++;
-      setTimeout(step, 260 + Math.random() * 180);
+      setTimeout(step, 110 + Math.random() * 70);
     } else {
       // Complete
       setTimeout(() => {
@@ -96,14 +96,14 @@
           if (typeof window.__saviaBootGreeting === 'function') {
             setTimeout(window.__saviaBootGreeting, 300);
           }
-        }, 550);
-      }, 300);
+        }, 350);
+      }, 150);
     }
   }
 
   document.body.classList.add('boot-locked');
   playBootHum();
-  setTimeout(step, 400);
+  setTimeout(step, 150);
 
   // Safety net: se qualcosa interrompe la sequenza, rimuovi comunque l'overlay
   setTimeout(function () {

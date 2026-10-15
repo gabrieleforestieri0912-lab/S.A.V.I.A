@@ -4,7 +4,7 @@
 
 **Versione:** 4.0.0
 **Runtime:** Electron 31 + Node.js
-**AI Engine:** Multi-provider (OpenRouter / OpenCode / Local) — modello selezionabile
+**AI Engine:** xKiro (https://api.xkiro.com/v1, OpenAI-compatible) — modello selezionabile
 **Tema:** Cyberpunk HUD — Ispirato a JARVIS
 
 ---
@@ -43,16 +43,15 @@
 │                    RENDERER PROCESS (Chromium)                    │
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────────┐   │
-│  │ Pagine: index.html  terminal.html  youtube.html            │   │
-│  │         particles.html  globe.html  knowledge.html         │   │
+│  │ Pagine: index.html  terminal.html  globe.html  knowledge.html         │   │
+│  │         particles.html  calendar.html  news.html  mcp.html               │   │
 │  └───────────────────────────────────────────────────────────┘   │
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────────┐   │
 │  │ Moduli Renderer:                                            │   │
 │  │ shared.js  agents.js  cognitive.js  telemetry.js            │   │
 │  │ memory.js  system-ops.js  voice-control.js                  │   │
-│  │ dashboard.js  commander.js  knowledge-base.js               │   │
-│  │ youtube.js  globe.js  particles.js                          │   │
+│  │ commander.js  knowledge-base.js  calendar.js                 │   │
 │  └───────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -76,10 +75,10 @@ S.A.V.I.A/
 │   └── savia.png             # Icona dell'app
 │
 ├── src/
-│   ├── index.html            # HUD principale — Terminale Cognitivo + Dashboard
-│   ├── terminal.html         # Command Center — File Explorer + Terminale
-│   ├── youtube.html          # Ricerca e riproduzione YouTube
+│   ├── index.html            # HUD principale — Chat + Editor
+│   ├── terminal.html         # Terminali PTY multi-tab con shell selezionabile
 │   ├── news.html             # News Feed Tech & AI + watchdog segnalazioni
+│   ├── calendar.html         # Calendario ed eventi (locale)
 │   ├── particles.html        # Motore 3D particelle neurali
 │   ├── globe.html            # Mappa mondiale 3D con meteo
 │   ├── knowledge.html        # Knowledge Base RAG
@@ -94,8 +93,7 @@ S.A.V.I.A/
 │   ├── memory.js             # Memoria contestuale personale
 │   ├── system-ops.js         # Esecuzione comandi di sistema
 │   ├── voice-control.js      # Wake word e speech-to-text
-│   ├── dashboard.js          # Dashboard a gauges circolari
-│   ├── commander.js          # File browser + emulatore terminale
+│   ├── commander.js          # Terminali PTY multi-tab
 │   ├── knowledge-base.js     # Interfaccia RAG
 │   ├── globe.js              # Visualizzazione 3D Terra
 │   ├── particles.js          # Sistema particelle 3D
@@ -120,7 +118,7 @@ Il processo principale Electron. Crea la finestra, gestisce i servizi di sistema
 | **Telemetry** | `telemetry-update` (push) | Ogni 2 secondi: CPU%, RAM, frequenza, carico, uptime |
 | **File Indexing** | `fs-index-start/stop/status`, `fs-event` (push) | Scansione ricorsiva directory + fs.watch |
 | **File Explorer** | `list-directory`, `delete-item`, `rename-item`, `select-directory-dialog`, `get-home-dir`, `open-in-explorer`, `get-drives` | CRUD file system |
-| **Terminale** | `terminal-set-cwd`, `terminal-get-cwd`, `terminal-execute`, `terminal-kill`, `terminal-output` (push) | Shell reale (cmd.exe su Windows, bash su Unix) |
+| **Terminale** | `terminal-pty-create`, `terminal-pty-write`, `terminal-pty-resize`, `terminal-pty-kill`, `terminal-pty-cwd`, `terminal-shells`, `terminal-env-check`, `terminal-pty-data` (push) | PTY reale con shell selezionabile (CMD/PowerShell/pwsh/Git Bash/WSL o bash/zsh), PATH arricchito per node/npm, quick-install CLI da palette |
 | **Memoria** | `memory-load`, `memory-save`, `memory-scan-projects`, `memory-add-conversation`, `memory-daily-summary` | Persistenza JSON in `savia-memory.json` |
 | **System Ops** | `system-open-app`, `system-close-app`, `system-move-file`, `system-search-files`, `system-screenshot`, `system-volume`, `system-brightness`, `system-list-processes` | Controllo completo del computer |
 | **Telemetry Estesa** | `get-extended-telemetry`, `get-process-list` | GPU, rete, dischi, processi (PowerShell WMI) |
@@ -152,7 +150,7 @@ Estrazione testo (per tipo file)
 Chunking (1500 caratteri, 200 overlap)
     │
     ▼
-Embedding via Local AI (nomic-embed-text)
+Embedding via xKiro (`/v1/embeddings`) con fallback hash offline (nessun server locale richiesto)
     │
     ▼
 Salvataggio in knowledge-base.json
@@ -178,33 +176,22 @@ Usa `contextBridge.exposeInMainWorld` per esporre `window.electronAPI` al render
 Layout a 3 pannelli:
 - **Sinistra:** Navigazione moduli, link progetti, indicatori servizi
 - **Centro:** Animazione reattore SVG + Terminale Cognitivo (chat)
-- **Destra:** Gauges telemetry, modalità sistema, selettore agente, controlli vocali, Memoria
+- **Destra:** telemetria live, memoria progetti, log eventi
 
 **Scripts caricati:**
 ```
 shared.js → agents.js → cognitive.js → telemetry.js → memory.js
-→ system-ops.js → voice-control.js → dashboard.js → knowledge-base.js
+→ system-ops.js → voice-control.js → knowledge-base.js
 ```
 
 **Viste:**
-- `Terminale` (default) — chat con AI
-- `Dashboard` — gauges SVG circolari (CPU, RAM, GPU, Temp, Disk, Net) + lista processi + pannello **UPCOMING SCHEDULE**
+- `Chat` (default) — chat con AI
+- `Editor` — editor codice integrato
 
 ### `terminal.html` — Command Center
 
-- **Centro:** File explorer (toolbar + lista file) + emulatore terminale + scanner AI
-- **Destra:** Telemetry + log ticker + mode toggles
-
-### `youtube.html` — YouTube Player
-
-- Ricerca video con filtri (ordine, durata, safeSearch)
-- Pannello dettagli con statistiche (view, like, commenti) e azioni rapide (PLAYLIST, ISCRIVITI, ANALIZZA)
-- Tab **PLAYLIST**: playlist locali (crea/apri/elimina, aggiungi e rimuovi video dal dettaglio)
-- Tab **ISCRITTI**: iscrizioni locali ai canali (dedup, rimozione, apertura canale)
-- Tab **ANALISI**: report di performance del canale (iscritti, visualizzazioni, engagement, medie, top video, durata media)
-- **Comandi vocali / testo** dall'index (che attraversano le finestre via localStorage `yt-cmd`):
-  `cerca su youtube …`, `aggiungi alla playlist …`, `rimuovi dalla playlist …`, `iscriviti al canale …`, `analizza canale …`
-- Chiave API configurabile da interfaccia
+- **Centro:** terminali PTY multi-tab con shell selezionabile + installazione rapida CLI
+- **Destra:** stato shell/npm + log ticker
 
 ### `news.html` — News Feed Tech & AI
 
@@ -282,7 +269,7 @@ Definisce 4 agenti specializzati + routing automatico.
 
 ### `cognitive.js` — Ponte AI (brain multi-provider)
 
-Il modulo centrale. Si connette al provider AI selezionato (OpenRouter / OpenCode / Local), gestisce chat streaming, input vocale, comandi azione e TTS.
+Il modulo centrale. Si connette a xKiro (OpenAI-compatible), gestisce chat streaming, input vocale, comandi azione e TTS.
 
 **Flusso chat (submit del form):**
 
@@ -335,12 +322,12 @@ Riceve push ogni 2 secondi dal main process e aggiorna:
 Persiste in `savia-memory.json`:
 - **Conversazioni:** ultime 50, con riassunto
 - **Progetti:** scansione automatica da `~/Documents/Progetti`
-- **Obiettivi:** short-term e long-term con CRUD
+- **Obiettivi:** short-term e long-term (solo dati)
 - **Persone:** contatti con contesto e ultimo contatto
 - **Riassunti giornalieri:** ultimi 30
 
 Il contesto viene iniettato nel prompt di sistema dell'AI via `buildMemoryContext()`:
-progetti attivi, obiettivi in corso, persone chiave, attività odierna.
+progetti attivi, persone chiave, attività odierna.
 
 ### `system-ops.js` — Operazioni di Sistema
 
@@ -372,30 +359,11 @@ IDLE → WAKE_LISTEN → "Hey SAVIA" → WAKE_HEARD
 - Heartbeat ogni 5s che riavvia il recognizer se morto silenziosamente
 - Modalità continua: dopo la risposta, riascolta subito senza wake word
 
-### `dashboard.js` — Gauges Dashboard + UPCOMING SCHEDULE
+### `commander.js` — Terminali PTY
 
-**Gauges SVG circolari:**
-- `setGauge(id, percentuale, label)` — aggiorna stroke-dashoffset
-- `getGaugeColor(pct, type)` — colore dinamico (verde < giallo < rosso)
-- Refresh ogni 3 secondi
-
-**Pannello UPCOMING SCHEDULE** — agenda unificata in tempo reale con countdown:
-
-- **Fonti dati**: eventi calendario e promemoria (`agent-data.json` via `agentTool`) + todo AI + obiettivi attivi (`savia-goals` in localStorage), fusi in un'unica lista ordinata per scadenza (all-day in coda).
-- **Countdown live**: ticker al secondo che mostra `T-` HH:MM:SS, stato `SCADUTO` a zero e label `OGGI`/`DOMANI`/data; i todo scaduti restano visibili (lo scheduler non li marca `fired`).
-- **Alert di scadenza**: alla transizione a scaduto, chime WebAudio (doppio beep 880/660Hz) + anello rosso pulsante sul pannello + contatore `⚠ N SCADUTI` lampeggiante — il tutto **dedupato** (una sola volta per item) e **controllabile** dal toggle volume nell'header (persistito in localStorage).
-- **Azione inline**: bottone 🗑 per eliminare eventi/promemoria/todo/obiettivi (con sync `calendar-sync` e pulizia della copia locale `calendar-events` per evitare resurrect) e checkbox ✓ per completare todo/obiettivi.
-- **Feedback animato**: completamento → check verde + strikethrough + fade-out a destra; eliminazione → fade-out rosso a sinistra. Il refresh 3s viene sospeso durante le animazioni (flag `upcomingAnimating`).
-- **Beep di conferma**: tono ascendente (523→784Hz) al completamento; notifica `OBIETTIVO COMPLETATO — X/Y` quando si completa l'ultimo todo/obiettivo.
-
-### `commander.js` — File Explorer + Terminale
-
-**File Explorer:**
-- Lista drive all'avvio
-- Navigazione con cronologia (back/forward/up)
-- Icone per tipo file (100+ mappature)
-- Menu contestuale: Rinomina, Elimina, Copia percorso, Apri in Explorer
-- Smart Scanner AI: descrive ogni file con AI locale (batch 5 file)
+**Terminali multi-tab + split:**
+- Shell selezionabile, PATH arricchito per node/npm, installazione rapida CLI
+- Controllo vocale integrato, palette comandi
 
 **Terminale Emulatore:**
 - Shell reale via IPC (cmd.exe/bash)
@@ -423,14 +391,6 @@ IDLE → WAKE_LISTEN → "Hey SAVIA" → WAKE_HEARD
 - Three.js: 3 forme (Sfera, Ipercubo, Galassia)
 - Controlli: conteggio, dimensione, colori base/accento, rotazione
 - MediaPipe: mano ruota campo, pinch scala, flick resetta
-
-### `youtube.js` — YouTube API
-
-- Connessione a YouTube Data API v3
-- Ricerca con filtri (order, duration, safeSearch)
-- Statistiche video (view, like, commenti)
-- Durata ISO 8601 → HH:MM:SS
-- Chiave API configurabile e salvata in localStorage
 
 ---
 
@@ -501,6 +461,13 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 - Se il wake word contiene già il comando, salta CAPTURING
 - Modalità continua: dopo TTS, riascolta immediatamente
 - TTS: ElevenLabs multilingua, voce persistente in localStorage
+- Engine STT a cascata: Web Speech API (cloud) → Whisper locale automatico
+  (su protocollo savia:// lo Speech cloud non risponde: si passa subito al locale)
+- Click sul microfono in chat = push-to-talk (parla subito, senza wake word)
+- Diagnostica in console: `await window.saviaVoiceDiag()` · test: `window.saviaVoiceTest()`
+- Pagine secondarie: ascolto leggero (page-voice.js) + Whisper locale, comandi
+  inoltrati alla chat di index.html via IPC; nel terminale "esegui <cmd>" corre
+  nel pane attivo
 - Un comando STAND BY consumato emette `savia-standby-command`, che riporta lo stato vocale a IDLE e riavvia l'ascolto (wake o continuo) senza rimanere bloccati in PROCESSING
 - **Power-on vocale**: quando la finestra è nascosta nella tray, chiamarla ("Hey SAVIA") la riapre e la porta in primo piano via IPC `window-reveal`; `backgroundThrottling: false` mantiene l'ascolto attivo anche a finestra nascosta
 - **STT locale (fallback Whisper)**: se lo Speech API cloud va in "retry" di rete (3 errori consecutivi) o non è disponibile, S.A.V.I.A passa automaticamente alla trascrizione locale (`src/stt-local.js`: mic + VAD → IPC → Whisper `Xenova/whisper-tiny` via transformers.js nel main process) — nessuna dipendenza dal cloud, riusa il pipeline STT della hotline (`call-server.transcribe`)
@@ -512,11 +479,10 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 
 | Servizio | Endpoint | Utilizzo | Modulo |
 |----------|----------|----------|--------|
-| **Local AI** | `localhost:11434/api/tags` | Health check | cognitive.js, commander.js |
-| **Local AI** | `localhost:11434/api/chat` | Chat completion | cognitive.js, commander.js |
-| **Local AI** | `localhost:11434/api/embeddings` | Embedding testi (nomic-embed-text) | main.js (RAG) |
+| **xKiro** | `api.xkiro.com/v1/models` | Health check + lista modelli | cognitive.js |
+| **xKiro** | `api.xkiro.com/v1/chat/completions` | Chat completion (stream) | cognitive.js, commander.js, call-server.js |
+| **xKiro** | `api.xkiro.com/v1/embeddings` | Embedding testi (con fallback offline) | main.js (RAG) |
 | **ElevenLabs** | `api.elevenlabs.io/v1/text-to-speech/{voice}` | Text-to-speech | cognitive.js |
-| **YouTube** | `www.googleapis.com/youtube/v3/*` | Ricerca e statistiche video | youtube.js |
 | **DuckDuckGo** | `api.duckduckgo.com` | Instant answer search | agents.js |
 | **Open-Meteo** | `api.open-meteo.com/v1/forecast` | Meteo città | globe.js |
 | **MediaPipe** | CDN `@mediapipe/hands` | Riconoscimento mani | globe.js, particles.js |
@@ -537,7 +503,7 @@ Stati: IDLE → WAKE_LISTEN → WAKE_HEARD → CAPTURING
 - **Modello AI selezionabile**: menu `AI MODEL` popolato da `/api/tags` — scegli il modello AI attivo (persistito in config).
 - **Config file**: `savia-config.json` (userData) per chiavi API e impostazioni — la chiave ElevenLabs non è più hardcoded nel codice.
 - **Saluto contestuale**: benvenuto JARVIS basato sull'ora del giorno (buongiorno/pomeriggio/sera) con fallback vocale locale.
-- **Pannello UPCOMING SCHEDULE nella Dashboard**: agenda unificata (eventi + promemoria + todo + obiettivi) con countdown live, alert acustico/visivo alla scadenza con toggle volume, azioni inline complete/elimina con animazioni di fade-out, beep di conferma e notifica `OBIETTIVO COMPLETATO` con conteggio progressi.
+- Agenda unificata rimossa con la dashboard; eventi e promemoria restano nel calendario e scattano via scheduler con notifica.
 - **MCP Servers (Connect Any App)**: connessione a qualunque app/agent tramite Model Context Protocol (stdio / SSE / HTTP) con l'SDK ufficiale. Pagina `mcp.html` per gestire i server e testare i tool; i tool MCP diventano utilizzabili dall'agente AI con `[TOOL] mcp:...` e dai comandi vocali.
 - **STAND BY**: pausa/ripresa dell'azione in corso (generazione streaming + TTS) esattamente dal punto in cui era rimasta — via chat ("pausa"/"ricomincia"), pulsante HUD o API `saviaStandbyPause/Resume`.
 

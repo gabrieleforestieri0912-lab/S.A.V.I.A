@@ -13,8 +13,27 @@ const typingIndicator = document.getElementById('typing-indicator');
 const systemBridgeStatus = document.getElementById('system-bridge-status');
 
 // ── Configurazione runtime (persistita in savia-config.json via IPC) ──
+// Provider AI: xKiro (https://api.xkiro.com/v1 — OpenAI-compatible).
+// La chiave vive in savia-config.json come `xkiroApiKey` (legacy: `openrouterApiKey`).
 function getDefaultModel() {
-  return 'nvidia/nemotron-3.5-lightning:free';
+  return 'qwen/qwen3.7-max:free';
+}
+
+function getAiBaseUrl() {
+  if (typeof xkiroBaseUrl !== 'undefined' && xkiroBaseUrl) return xkiroBaseUrl;
+  if (typeof openrouterBaseUrl !== 'undefined' && openrouterBaseUrl) return openrouterBaseUrl;
+  return 'https://api.xkiro.com/v1';
+}
+
+function getAiApiKey() {
+  if (typeof xkiroApiKey !== 'undefined' && xkiroApiKey) return xkiroApiKey;
+  if (typeof openrouterApiKey !== 'undefined' && openrouterApiKey) return openrouterApiKey;
+  return '';
+}
+
+function setAiApiKey(v) {
+  xkiroApiKey = v || '';
+  openrouterApiKey = v || ''; // alias legacy
 }
 
 let activeModel = localStorage.getItem('savia-model') || getDefaultModel();
@@ -28,47 +47,71 @@ async function loadRuntimeConfig() {
     if (window.electronAPI && window.electronAPI.configGet) {
       const cfg = await window.electronAPI.configGet();
       if (cfg) {
-        if (cfg.openrouterApiKey) openrouterApiKey = cfg.openrouterApiKey;
+        const key = cfg.xkiroApiKey || cfg.openrouterApiKey || '';
+        if (key) setAiApiKey(key);
+        if (cfg.xkiroBaseUrl) { xkiroBaseUrl = cfg.xkiroBaseUrl; openrouterBaseUrl = cfg.xkiroBaseUrl; }
         if (cfg.activeModel) activeModel = cfg.activeModel;
+        // Voce ElevenLabs da config (la sidebar non ha più impostazioni):
+        // la chiave attiva subito la sintesi di qualità.
+        if (cfg.elevenLabsKey) {
+          ELEVENLABS_API_KEY = cfg.elevenLabsKey;
+          try { localStorage.setItem('elevenlabs-key', cfg.elevenLabsKey); } catch (e) {}
+          useElevenLabs = true;
+          try { localStorage.setItem('use-elevenlabs', 'true'); } catch (e) {}
+          updateElevenLabsUI();
+          fetchElevenLabsVoices();
+        }
+        if (cfg.elevenLabsVoiceId) {
+          elevenLabsVoiceId = cfg.elevenLabsVoiceId;
+          try { localStorage.setItem('elevenlabs-voice-id', cfg.elevenLabsVoiceId); } catch (e) {}
+        }
       }
     }
   } catch (e) { /* ignore */ }
-  aiProvider = 'openrouter';
-  if (!activeModel || activeModel === 'mistral' || activeModel === 'claude-sonnet-4-5') {
-    activeModel = 'nvidia/nemotron-3.5-lightning:free';
+  aiProvider = 'xkiro';
+  if (!activeModel || activeModel === 'mistral' || activeModel === 'claude-sonnet-4-5' || activeModel === 'nvidia/nemotron-3.5-lightning:free') {
+    activeModel = getDefaultModel();
     localStorage.setItem('savia-model', activeModel);
   }
   if (window.electronAPI && window.electronAPI.configSet) {
     try {
       await window.electronAPI.configSet({
-        aiProvider: 'openrouter',
-        openrouterApiKey: typeof openrouterApiKey !== 'undefined' ? openrouterApiKey : '',
+        aiProvider: 'xkiro',
+        xkiroApiKey: getAiApiKey(),
+        openrouterApiKey: getAiApiKey(),
         activeModel
       });
     } catch (e) { /* ignore */ }
   }
 }
 
-// Popola il selettore modello con i modelli disponibili su OpenRouter
+// Popola il selettore modello con i modelli disponibili su xKiro (GET /v1/models)
 async function refreshModelList() {
   const sel = document.getElementById('model-select');
   if (!sel) return;
+  const base = getAiBaseUrl();
+  const key = getAiApiKey();
+  if (!key) {
+    sel.innerHTML = `<option value="${activeModel}">${activeModel} (imposta la chiave xKiro)</option>`;
+    sel.value = activeModel;
+    return;
+  }
   try {
-    const res = await fetch(`${openrouterBaseUrl}/models`, {
-      headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
+    const res = await fetch(`${base}/models`, {
+      headers: { 'Authorization': `Bearer ${key}` }
     });
     if (!res.ok) return;
     const data = await res.json();
-    const all = (data.data || []).map(m => m.id);
-    const free = all.filter(m => m.endsWith(':free'));
-    const paid = all.filter(m => !m.endsWith(':free'));
-    const models = [...free, ...paid];
-    if (!models.length) return;
+    const all = (data.data || []).map(m => m.id).filter(Boolean);
+    if (!all.length) return;
+    // Preferisci i modelli free verificati di xKiro in cima, poi il resto
+    const preferred = ['qwen/qwen3.7-max:free', 'qwen/qwen3.8-max:free', 'openai/gpt-5.6-sol', 'z-ai/glm-5.2'];
+    const models = [...preferred.filter(m => all.includes(m)), ...all.filter(m => !preferred.includes(m))];
     sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
     if (models.includes(activeModel)) {
       sel.value = activeModel;
     } else {
-      activeModel = models.includes('nvidia/nemotron-3.5-lightning:free') ? 'nvidia/nemotron-3.5-lightning:free' : models[0];
+      activeModel = models.includes(getDefaultModel()) ? getDefaultModel() : models[0];
       sel.value = activeModel;
     }
     localStorage.setItem('savia-model', activeModel);
@@ -79,9 +122,9 @@ function applyModelToUI() {
   const sel = document.getElementById('model-select');
   if (sel) sel.value = activeModel;
   const modelInfo = document.getElementById('chat-model-info');
-  if (modelInfo) modelInfo.textContent = `INTELLIGENZA: OPENROUTER // ${activeModel.toUpperCase()}`;
+  if (modelInfo) modelInfo.textContent = `xKiro · ${activeModel.replace(':free', '')}`;
   const modelStatus = document.getElementById('model-status-text');
-  if (modelStatus) modelStatus.textContent = `ACTIVE MODEL // ${activeModel.toUpperCase()}`;
+  if (modelStatus) modelStatus.textContent = activeModel;
 }
 
 if (document.getElementById('model-select')) {
@@ -92,10 +135,40 @@ if (document.getElementById('model-select')) {
       window.electronAPI.configSet({ activeModel }).catch(() => {});
     }
     applyModelToUI();
-    const providerLabel = 'OpenRouter';
+    const providerLabel = 'xKiro';
     addTickerEvent('agent', `Modello AI cambiato (${providerLabel}): ${activeModel}`);
   });
 }
+
+// Campo chiave xKiro nel pannello AI MODEL: salva in savia-config.json e riverifica il ponte
+(function initXkiroKeyInput() {
+  const input = document.getElementById('xkiro-key-input');
+  if (!input) return;
+  const fill = () => {
+    try {
+      const k = getAiApiKey();
+      if (k && !input.value) input.value = k;
+      if (k) input.placeholder = 'xKiro API key impostata ✓ (sk-xt-...' + k.slice(-4) + ')';
+    } catch (e) { /* ignore */ }
+  };
+  setTimeout(fill, 800);
+  setTimeout(fill, 3000);
+  let t = null;
+  input.addEventListener('input', function() {
+    clearTimeout(t);
+    t = setTimeout(async function() {
+      const v = input.value.trim();
+      if (!v || v.length < 8) return;
+      setAiApiKey(v);
+      if (window.electronAPI && window.electronAPI.configSet) {
+        try { await window.electronAPI.configSet({ xkiroApiKey: v, openrouterApiKey: v, aiProvider: 'xkiro' }); } catch (e) {}
+      }
+      input.placeholder = 'xKiro API key impostata ✓';
+      addTickerEvent('agent', 'Chiave xKiro salvata. Riverifico il ponte...');
+      refreshModelList().then(() => { applyModelToUI(); checkAiBridge(); });
+    }, 900);
+  });
+})();
 
 let welcomeSent = sessionStorage.getItem('savia-welcome-sent') === 'true';
 // Flag condivisi per evitare doppio saluto vocale tra benvenuto AI e saluto locale
@@ -138,40 +211,61 @@ let lastBridgeState = null;
 
 async function checkAiBridge() {
   const startTime = Date.now();
-  const endpointDesc = 'OpenRouter (openrouter.ai)';
-  const providerName = 'OpenRouter';
+  const endpointDesc = 'xKiro (api.xkiro.com)';
+  const providerName = 'xKiro';
+  const base = getAiBaseUrl();
+  const key = getAiApiKey();
+  if (!key) {
+    aiOnline = false;
+    systemBridgeStatus.textContent = 'Chiave mancante';
+    systemBridgeStatus.style.color = 'var(--accent-gold)';
+    systemBridgeStatus.style.textShadow = 'none';
+    if (aiStatusDot) aiStatusDot.className = 'item-status offline';
+    if (aiStatusText) aiStatusText.textContent = 'chiave xKiro mancante';
+    if (svcCognitive) {
+      setServiceStatus(svcCognitive, 'warning');
+      const desc = svcCognitive.querySelector('.item-desc');
+      if (desc) { desc.textContent = 'Imposta la chiave xKiro'; desc.style.color = 'var(--accent-gold)'; }
+    }
+    const initLog = document.getElementById('initialization-log');
+    if (initLog && initLog.textContent.includes('Connessione')) {
+      initLog.textContent = 'In attesa della chiave xKiro (sk-xt-...) dal pannello Modello AI.';
+    }
+    lastBridgeState = false;
+    return;
+  }
   try {
-    const res = await fetch(`${openrouterBaseUrl}/auth/key`, {
+    const res = await fetch(`${base}/models`, {
       method: 'GET',
-      headers: { 'Authorization': `Bearer ${openrouterApiKey}` }
+      headers: { 'Authorization': `Bearer ${key}` }
     });
     if (res.ok) {
       const duration = Date.now() - startTime;
       const wasOffline = !aiOnline;
       aiOnline = true;
       if (wasOffline && lastBridgeState === false && typeof sendNotification === 'function') {
-        sendNotification(`Cognitive bridge ONLINE. Motore AI (${providerName}) pronto.`, 'success', 3000);
+        sendNotification('Savia online.', 'success', 3000);
       }
-      systemBridgeStatus.textContent = `COGNITIVE BRIDGE // ${providerName.toUpperCase()} ONLINE`;
+      systemBridgeStatus.textContent = 'Online';
       systemBridgeStatus.style.color = 'var(--accent-cyan)';
-      systemBridgeStatus.style.textShadow = '0 0 10px var(--accent-cyan-glow)';
+      systemBridgeStatus.style.textShadow = 'none';
 
       if (aiStatusDot) aiStatusDot.className = 'item-status online';
-      if (aiStatusText) aiStatusText.textContent = `status: ${providerName.toLowerCase()} active`;
+      if (aiStatusText) aiStatusText.textContent = 'online';
 
       if (svcCognitive) {
         setServiceStatus(svcCognitive, 'online');
         const desc = svcCognitive.querySelector('.item-desc');
-        if (desc) { desc.textContent = `${activeModel} Active // ${duration}ms`; desc.style.color = 'var(--accent-cyan)'; }
+        if (desc) { desc.textContent = `${activeModel} · ${duration}ms`; desc.style.color = 'var(--accent-cyan)'; }
       }
 
       fillPing.style.width = `${Math.min(100, Math.max(5, Math.round(duration / 2)))}%`;
       txtPingLoad.textContent = `${duration} ms`;
 
       const initLog = document.getElementById('initialization-log');
-      if (initLog && initLog.textContent.includes('Verifying')) {
-        initLog.textContent = `Cognitive bridge established on ${endpointDesc}. ${activeModel} synaptic pathways locked and operational.`;
-        addTickerEvent('agent', `${activeModel} collegato via ${providerName}.`);
+      if (initLog && initLog.textContent.includes('Connessione')) {
+        initLog.textContent = `Online · ${activeModel}`;
+        addTickerEvent('agent', `${activeModel} collegato.`);
       }
 
       if (!welcomeSent) sendWelcomeMessage();
@@ -187,30 +281,30 @@ async function checkAiBridge() {
   } catch (error) {
     aiOnline = false;
     if (lastBridgeState !== false) {
-      if (typeof sendNotification === 'function') sendNotification(`Cognitive bridge OFFLINE. ${providerName} non raggiungibile.`, 'error', 8000);
+      if (typeof sendNotification === 'function') sendNotification('Savia non connessa.', 'error', 8000);
     }
-    systemBridgeStatus.textContent = 'COGNITIVE BRIDGE // UNSTABLE';
+    systemBridgeStatus.textContent = 'Non connesso';
     systemBridgeStatus.style.color = 'var(--accent-red)';
-    systemBridgeStatus.style.textShadow = '0 0 10px var(--accent-red-glow)';
+    systemBridgeStatus.style.textShadow = 'none';
 
     if (aiStatusDot) aiStatusDot.className = 'item-status offline';
-    if (aiStatusText) aiStatusText.textContent = 'status: disconnected';
+    if (aiStatusText) aiStatusText.textContent = 'non connesso';
 
     if (svcCognitive) {
       setServiceStatus(svcCognitive, 'offline');
       const desc = svcCognitive.querySelector('.item-desc');
-      if (desc) { desc.textContent = `${providerName} OFFLINE`; desc.style.color = 'var(--accent-red)'; }
+      if (desc) { desc.textContent = 'Non connesso'; desc.style.color = 'var(--accent-red)'; }
     }
 
     fillPing.style.width = '0%';
-    txtPingLoad.textContent = 'OFFLINE';
+    txtPingLoad.textContent = '--';
 
     lastBridgeState = false;
 
     const initLog = document.getElementById('initialization-log');
-    if (initLog && initLog.textContent.includes('Verifying')) {
-      initLog.innerHTML = `Cognitive bridge <span style="color: var(--accent-red); font-weight: bold;">OFFLINE</span>. ${providerName} non raggiungibile su ${endpointDesc}. I comandi AI useranno i simulatori locali.`;
-      addTickerEvent('warn', `Cognitive bridge connection failed on ${endpointDesc}.`);
+    if (initLog && initLog.textContent.includes('Connessione')) {
+      initLog.textContent = 'Non connesso — verifica chiave e modello.';
+      addTickerEvent('warn', 'Connessione al modello non riuscita.');
     }
   }
 }
@@ -229,13 +323,13 @@ loadRuntimeConfig().then(() => {
   applyModelToUI();
 });
 
-// Funzione unificata per streaming chat — solo OpenRouter
+// Funzione unificata per streaming chat — xKiro (OpenAI-compatible /v1/chat/completions)
 async function streamAiChatCompletion({ messages, onToken, signal }) {
   {
-    const url = `${openrouterBaseUrl}/chat/completions`;
+    const url = `${getAiBaseUrl()}/chat/completions`;
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openrouterApiKey}`,
+      'Authorization': `Bearer ${getAiApiKey()}`,
       'HTTP-Referer': 'https://github.com/savia',
       'X-Title': 'S.A.V.I.A'
     };
@@ -266,7 +360,7 @@ async function streamAiChatCompletion({ messages, onToken, signal }) {
         errText = await response.text();
       }
 
-      throw new Error(`OpenRouter API error (${response.status}): ${errText}`);
+      throw new Error(`xKiro API error (${response.status}): ${errText}`);
     }
 
     const reader = response.body.getReader();
@@ -457,7 +551,7 @@ terminalForm.addEventListener('submit', async (e) => {
       // Update agent indicator in chat
       const modelInfo = document.getElementById('chat-model-info');
       if (modelInfo) {
-        modelInfo.textContent = `AGENT: ${agentLabel} // ${getActiveModel().toUpperCase()}`;
+        modelInfo.textContent = `${agentLabel} · ${getActiveModel().replace(':free', '')}`;
         modelInfo.style.color = agent ? agent.color : 'var(--accent-cyan)';
       }
 
@@ -477,6 +571,8 @@ terminalForm.addEventListener('submit', async (e) => {
       ];
 
       typingIndicator.classList.add('hidden');
+
+      if (typeof window.saviaOrbSet === 'function') window.saviaOrbSet('think');
 
       const streamTextRef = appendLogMessage('savia', '', 'ai');
       const agentBadge = document.createElement('span');
@@ -537,8 +633,9 @@ terminalForm.addEventListener('submit', async (e) => {
     } catch (streamError) {
       typingIndicator.classList.add('hidden');
       streamActive = false;
+      if (typeof window.saviaOrbSet === 'function') window.saviaOrbSet('idle');
       playAudio(audioBeep);
-      appendLogMessage('sys_err', `COGNITIVE STREAM INTERRUPTED: Connection error during active synthesis. Details: ${streamError.message}`, 'error');
+      appendLogMessage('sys_err', `Risposta interrotta: errore di connessione. Dettagli: ${streamError.message}`, 'error');
     }
   } else {
     setTimeout(() => {
@@ -546,11 +643,9 @@ terminalForm.addEventListener('submit', async (e) => {
       playAudio(audioBeep);
 
       appendLogMessage('sys_err',
-        `COGNITIVE BRIDGE UNREACHABLE.<br><br>` +
-        `Connection to AI provider on <span style="color:var(--accent-cyan); font-weight:bold;">OpenRouter</span> failed.<br>` +
-        `Please verify that the AI service is active and the model is available.<br><br>` +
-        `Initialize the cognitive core by checking your AI provider configuration.<br>` +
-        `<span class="ai-command-hint">Check AI provider settings</span>`,
+        `Non connesso.<br><br>` +
+        `Verifica la <span style="font-weight:bold;">chiave xKiro</span> e il modello selezionato, poi riprova.<br>` +
+        `<span class="ai-command-hint">Controlla le impostazioni xKiro</span>`,
         'error'
       );
 
@@ -615,7 +710,7 @@ window.saviaIsSpeaking = isActionRunning;
 function updateStandbyUI() {
   const statusText = document.getElementById('agent-status-text');
   if (statusText) {
-    statusText.textContent = standbyActive ? 'STAND BY — azione in pausa' : 'AUTO — Waiting for input';
+    statusText.textContent = standbyActive ? 'In pausa' : 'In attesa';
     statusText.style.color = standbyActive ? 'var(--accent-gold)' : '';
   }
   const dot = document.getElementById('agent-dot');
@@ -630,8 +725,8 @@ function updateStandbyBtn() {
   if (!standbyBtn) return;
   standbyBtn.classList.toggle('active', standbyActive);
   standbyBtn.innerHTML = standbyActive
-    ? '<span class="indicator"></span> RIPRENDI (RICOMINCIA)'
-    : '<span class="indicator"></span> STAND BY (PAUSA)';
+    ? '<span class="indicator"></span> Riprendi'
+    : '<span class="indicator"></span> Pausa';
   const ind = standbyBtn.querySelector('.indicator');
   if (ind) {
     ind.style.background = standbyActive ? 'var(--accent-gold)' : '#555';
@@ -644,16 +739,18 @@ function standbyPause() {
   if (!isActionRunning()) return { ok: false, reason: 'none' };
   standbyActive = true;
   updateStandbyUI();
+  if (typeof window.saviaOrbSet === 'function') window.saviaOrbSet('idle');
   if (ttsAudioEl) { try { ttsAudioEl.pause(); } catch (e) {} }
   if (synth && synth.speaking) { try { synth.pause(); } catch (e) {} }
-  addTickerEvent('sys', 'STAND BY — azione in pausa. Dite "ricomincia" per riprendere esattamente da dove era.');
-  if (typeof sendNotification === 'function') sendNotification('S.A.V.I.A in STAND BY. Dite "ricomincia".', 'info', 2500);
+  addTickerEvent('sys', 'In pausa. Di\' "riprendi" per continuare da dove era.');
+  if (typeof sendNotification === 'function') sendNotification('Savia in pausa. Di\' "riprendi".', 'info', 2500);
   return { ok: true };
 }
 
 function standbyResume() {
   if (!standbyActive) return { ok: false, reason: 'not-active' };
   standbyActive = false;
+  if (typeof window.saviaOrbSet === 'function') window.saviaOrbSet('think');
   if (ttsAudioEl) { try { ttsAudioEl.play().catch(function () {}); } catch (e) {} }
   if (synth && synth.paused) { try { synth.resume(); } catch (e) {} }
   if (standbyResumeResolve) {
@@ -662,7 +759,7 @@ function standbyResume() {
     r();
   }
   updateStandbyUI();
-  addTickerEvent('sys', 'RIPRESA — si continua esattamente da dove era rimasto.');
+  addTickerEvent('sys', 'Ripresa da dove era rimasta.');
   if (typeof sendNotification === 'function') sendNotification('S.A.V.I.A ripreso.', 'success', 2000);
   return { ok: true };
 }
@@ -683,8 +780,8 @@ function handleStandbyCommand(query) {
   if (!cmd) return false;
   if (cmd === 'stop') {
     stopSpeaking();
-    addTickerEvent('sys', 'Interruzione vocale eseguita: sintesi arrestata.');
-    if (typeof sendNotification === 'function') sendNotification('S.A.V.I.A: Sintesi arrestata.', 'info', 1500);
+    addTickerEvent('sys', 'Sintesi interrotta.');
+    if (typeof sendNotification === 'function') sendNotification('Sintesi interrotta.', 'info', 1500);
     return true;
   }
   if (cmd === 'pause') {
@@ -692,7 +789,7 @@ function handleStandbyCommand(query) {
     if (!r.ok) {
       addTickerEvent(r.reason === 'already' ? 'sys' : 'warn',
         r.reason === 'already'
-          ? 'Già in STAND BY. Dite "ricomincia".'
+          ? 'Già in pausa. Di\' "riprendi".'
           : 'Nessuna azione in corso da mettere in pausa.');
     }
   } else {
@@ -717,7 +814,7 @@ function initStandbyButton() {
       if (!r.ok) {
         addTickerEvent(r.reason === 'already' ? 'sys' : 'warn',
           r.reason === 'already'
-            ? 'Già in STAND BY. Premi di nuovo per riprendere.'
+            ? 'Già in pausa. Premi di nuovo per riprendere.'
             : 'Nessuna azione in corso da mettere in pausa.');
       }
     });
@@ -824,14 +921,19 @@ function updateAutoSpeakUI() {
   }
 }
 
+function saviaToggleAutoSpeak() {
+  autoSpeak = !autoSpeak;
+  try { localStorage.setItem('auto-speak', String(autoSpeak)); } catch (e) {}
+  updateAutoSpeakUI();
+  if (typeof playAudio === 'function' && typeof audioClick !== 'undefined') playAudio(audioClick);
+  if (typeof addTickerEvent === 'function') addTickerEvent('sys', 'Risposta vocale: ' + (autoSpeak ? 'attiva' : 'disattiva'));
+  return autoSpeak;
+}
+window.saviaToggleAutoSpeak = saviaToggleAutoSpeak;
+
 if (autoSpeakBtn) {
   updateAutoSpeakUI();
-  autoSpeakBtn.addEventListener('click', function() {
-    autoSpeak = !autoSpeak;
-    localStorage.setItem('auto-speak', String(autoSpeak));
-    updateAutoSpeakUI();
-    playAudio(audioClick);
-  });
+  autoSpeakBtn.addEventListener('click', function() { saviaToggleAutoSpeak(); });
 }
 
 async function elevenLabsSpeak(text) {

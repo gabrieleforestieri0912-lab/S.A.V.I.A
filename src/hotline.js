@@ -178,12 +178,13 @@ chkAuto?.addEventListener('change', async () => {
   log('sys', 'Autostart hotline: ' + (chkAuto.checked ? 'ATTIVO' : 'DISATTIVO'));
 });
 
-// Push del "cervello" corrente (modello + prompt della dashboard)
+// Push del "cervello" corrente (modello + prompt della dashboard) — il backend
+// usa sempre xKiro, la chiave viene letta da savia-config.json nel main process.
 function pushBrain() {
   const model = (typeof getActiveModel === 'function') ? getActiveModel() : null;
   const systemPrompt = (typeof getAgentPrompt === 'function') ? getAgentPrompt() : null;
   if (window.electronAPI?.callHotlineBrain && model) {
-    window.electronAPI.callHotlineBrain({ model, systemPrompt, aiHost: 'http://localhost:11434' });
+    window.electronAPI.callHotlineBrain({ model, systemPrompt });
   }
 }
 

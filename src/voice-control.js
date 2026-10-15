@@ -177,15 +177,32 @@ function updateChatMic(state) {
     setTimeout(function() { chatVcMic.className = 'vc-mic listen fas fa-microphone-alt'; }, 500);
   }
   if (chatVcLabel) {
-    var labels = { idle: 'VOCE', wake_listen: 'ASCOLTO', wake_heard: 'RICEVUTO',
-      capturing: 'PARLA', processing: 'ELABORA', speaking: 'RISPONDE' };
-    chatVcLabel.textContent = labels[state] || 'VOCE';
+    var labels = { idle: 'Voce', wake_listen: 'Ascolto', wake_heard: 'Ok',
+      capturing: 'Parla', processing: 'Attendi', speaking: 'Rispondo' };
+    chatVcLabel.textContent = labels[state] || 'Voce';
   }
 }
 
 function setVoiceState(newState) {
   const prev = voiceState;
   voiceState = newState;
+
+  updateChatMic(newState);
+
+  // Globo olografico reattivo
+  if (typeof window.saviaOrbSet === 'function') {
+    const orbModes = {
+      idle: 'idle', wake_listen: 'listen', wake_heard: 'heard',
+      capturing: 'capture', processing: 'think', speaking: 'speak'
+    };
+    window.saviaOrbSet(orbModes[newState] || 'idle');
+  }
+
+  // While SAVIA is thinking or speaking the mic is fully released:
+  // avoids echo wake-triggers and frees the audio device for TTS.
+  if (newState === VoiceState.PROCESSING || newState === VoiceState.SPEAKING) {
+    releaseRecognizer();
+  }
 
   const dot = vcStatusDot;
   const text = vcStatusText;
@@ -195,40 +212,32 @@ function setVoiceState(newState) {
   switch (newState) {
     case VoiceState.IDLE:
       dot.classList.add('vc-idle');
-      if (text) text.textContent = 'IDLE';
+      if (text) text.textContent = 'Pronto';
       break;
     case VoiceState.WAKE_LISTEN:
       dot.classList.add('vc-listen');
-      if (text) text.textContent = 'IN ASCOLTO...';
+      if (text) text.textContent = 'Ascolto';
       break;
     case VoiceState.WAKE_HEARD:
       dot.classList.add('vc-heard');
-      if (text) text.textContent = 'RICEVUTO!';
+      if (text) text.textContent = 'Ok';
       break;
     case VoiceState.CAPTURING:
       dot.classList.add('vc-capture');
-      if (text) text.textContent = 'COMANDO...';
+      if (text) text.textContent = 'Parla';
       break;
     case VoiceState.PROCESSING:
       dot.classList.add('vc-process');
-      if (text) text.textContent = 'ELABORAZIONE...';
+      if (text) text.textContent = 'Elaboro';
       break;
     case VoiceState.SPEAKING:
       dot.classList.add('vc-speak');
-      if (text) text.textContent = 'RISPONDE...';
+      if (text) text.textContent = 'Rispondo';
       break;
   }
 
-  updateChatMic(newState);
-
   if (prev !== newState && newState === VoiceState.WAKE_HEARD) {
     playAudio(audioBeep);
-  }
-
-  // While SAVIA is thinking or speaking the mic is fully released:
-  // avoids echo wake-triggers and frees the audio device for TTS.
-  if (newState === VoiceState.PROCESSING || newState === VoiceState.SPEAKING) {
-    releaseRecognizer();
   }
 }
 
@@ -283,6 +292,16 @@ function startWakeListener() {
   if (!voiceSupported || !wakeActive) return;
   if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) return;
   if (wakeListening) return;
+
+  // SpeechRecognition assente (es. protocollo savia:// in Electron) → Whisper locale
+  if (!SR) {
+    if (window.LocalSTT && window.LocalSTT.supported()) {
+      activateLocalVoice('Speech API cloud non disponibile — uso Whisper locale.');
+    } else if (vcStatusText) {
+      vcStatusText.textContent = 'VOCE NON SUPP.';
+    }
+    return;
+  }
 
   if (localArmed()) { startLocalArm('wake'); return; }
 
@@ -374,6 +393,18 @@ function scheduleWakeRestart(delay) {
 
 function startCommandCapture() {
   if (!voiceSupported || !wakeActive) return;
+
+  // Senza SpeechRecognition vai diretto sul motore locale
+  if (!SR) {
+    if (window.LocalSTT && window.LocalSTT.supported()) {
+      if (!localMode) localMode = true;
+      try { window.LocalSTT.stop(); } catch (e) {}
+      wakeListening = false;
+      setVoiceState(VoiceState.CAPTURING);
+      startLocalArm('capture');
+    }
+    return;
+  }
 
   if (localArmed()) { startLocalArm('capture'); return; }
 
@@ -561,6 +592,82 @@ function waitForAudioEnd() {
   });
 }
 
+// ── Push-to-talk (click microfono in chat) + diagnostica ─────────────
+// Il click sul microfono cattura UN comando subito, senza wake word.
+// Funziona anche se lo SpeechRecognition cloud non esiste (Whisper locale).
+function pushToTalkOnce() {
+  if (typeof playAudio === 'function' && typeof audioClick !== 'undefined' && audioClick) playAudio(audioClick);
+  if (voiceState === VoiceState.PROCESSING || voiceState === VoiceState.SPEAKING) {
+    if (typeof addTickerEvent === 'function') addTickerEvent('sys', 'Voce occupata — attendi la fine della risposta.');
+    return { ok: false, reason: 'busy' };
+  }
+  if (voiceState === VoiceState.CAPTURING) return { ok: false, reason: 'already-capturing' };
+  if (!wakeActive) {
+    wakeActive = true;
+    try { localStorage.setItem('vc-wake', 'true'); } catch (e) {}
+    updateWakeUI();
+  }
+  if (!SR && window.LocalSTT && window.LocalSTT.supported()) {
+    if (!localMode) {
+      localMode = true;
+      if (typeof addTickerEvent === 'function') addTickerEvent('sys', 'Push-to-talk: Whisper locale attivo.');
+      window.LocalSTT.ensureModel().catch(() => {});
+    }
+    try { window.LocalSTT.stop(); } catch (e) {}
+    wakeListening = false;
+    if (captureTimeout) { clearTimeout(captureTimeout); captureTimeout = null; }
+    captureTimeout = setTimeout(() => {
+      captureTimeout = null;
+      try { if (window.LocalSTT) window.LocalSTT.stop(); } catch (e) {}
+      wakeListening = false;
+      if (voiceState === VoiceState.CAPTURING) setVoiceState(VoiceState.IDLE);
+      if (wakeActive) scheduleWakeRestart(250);
+    }, commandTimeoutMs);
+    setVoiceState(VoiceState.CAPTURING);
+    startLocalArm('capture');
+    return { ok: true, engine: 'local' };
+  }
+  if (!SR) {
+    if (typeof addTickerEvent === 'function') addTickerEvent('error', 'Voce non disponibile: microfono o STT non accessibili.');
+    return { ok: false, reason: 'unsupported' };
+  }
+  startCommandCapture();
+  return { ok: true, engine: localArmed() ? 'local' : 'cloud' };
+}
+
+// Diagnostica vocale richiamabile da console o da comandi: window.saviaVoiceDiag()
+window.saviaVoiceTest = pushToTalkOnce;
+window.saviaVoiceDiag = async function () {
+  const diag = {
+    speechRecognition: !!SR,
+    micApi: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+    localSTT: !!(window.LocalSTT && window.LocalSTT.supported()),
+    localMode,
+    cloudNetworkFailures,
+    state: voiceState,
+    wakeActive,
+    continuousMode,
+    micPermission: 'unknown',
+    ttsVoices: 0
+  };
+  try {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      diag.micPermission = 'granted';
+      s.getTracks().forEach(t => t.stop());
+    }
+  } catch (e) {
+    diag.micPermission = (e && e.name) || 'denied';
+  }
+  try {
+    if (window.speechSynthesis) diag.ttsVoices = window.speechSynthesis.getVoices().length;
+  } catch (e) { /* ignore */ }
+  if (typeof addTickerEvent === 'function') {
+    addTickerEvent('sys', `VOICE DIAG — SR:${diag.speechRecognition ? 'ok' : 'NO'} mic:${diag.micPermission} localSTT:${diag.localSTT ? 'ok' : 'NO'} engine:${diag.localMode ? 'locale' : 'cloud'} stato:${diag.state} ttsVoci:${diag.ttsVoices}`);
+  }
+  return diag;
+};
+
 // ── UI Controls ─────────────────────────────────────────────────────
 
 function toggleWake() {
@@ -659,6 +766,13 @@ function initVoiceControl() {
   }
 
   setVoiceState(VoiceState.IDLE);
+
+  // Click sul microfono della chat = push-to-talk (parla subito, niente wake word)
+  if (chatVcMic) {
+    chatVcMic.style.cursor = 'pointer';
+    chatVcMic.title = 'Click e parla: cattura un comando vocale subito';
+    chatVcMic.addEventListener('click', () => { pushToTalkOnce(); });
+  }
 
   if (wakeActive) {
     setTimeout(() => {

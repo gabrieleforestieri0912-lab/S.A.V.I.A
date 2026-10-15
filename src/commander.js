@@ -43,6 +43,76 @@
   const statusPanes = document.getElementById('status-panes');
   const statusFocus = document.getElementById('status-focus');
   const statusCwd = document.getElementById('status-cwd');
+  const shellSelect = document.getElementById('shell-select');
+  const statusNpm = document.getElementById('status-npm');
+
+  // ── Shell selezionabile + stato npm/node ──────────────────────────
+  let preferredShell = '';
+  try { preferredShell = localStorage.getItem('savia-term-shell') || ''; } catch (e) {}
+  let availableShells = [];
+
+  async function refreshShellList() {
+    if (!window.electronAPI || !window.electronAPI.terminalPtyShells) return;
+    try {
+      const r = await window.electronAPI.terminalPtyShells();
+      availableShells = (r && r.shells) || [];
+      if (shellSelect) {
+        shellSelect.innerHTML = '';
+        availableShells.forEach(s => {
+          const o = document.createElement('option');
+          o.value = s.id;
+          o.textContent = s.label + (s.available ? '' : ' (non trovata)');
+          o.disabled = !s.available;
+          shellSelect.appendChild(o);
+        });
+        if (preferredShell && availableShells.some(s => s.id === preferredShell && s.available)) {
+          shellSelect.value = preferredShell;
+        } else {
+          const first = availableShells.find(s => s.available);
+          if (first) {
+            preferredShell = first.id;
+            shellSelect.value = first.id;
+            try { localStorage.setItem('savia-term-shell', preferredShell); } catch (e) {}
+          }
+        }
+      }
+      appendShellPaletteEntries();
+    } catch (e) { /* ignore */ }
+  }
+
+  if (shellSelect) {
+    shellSelect.addEventListener('change', () => {
+      preferredShell = shellSelect.value || '';
+      try { localStorage.setItem('savia-term-shell', preferredShell); } catch (e) {}
+      // Vale per i nuovi tab/pane; per applicarlo subito al pane attivo lo ricreiamo
+      if (activePane && activePane.ptyId && window.electronAPI) {
+        window.electronAPI.terminalPtyKill(activePane.ptyId).catch(() => {});
+        activePane.ptyId = null;
+        activePane.term.writeln('\r\n\x1b[38;5;245m[Shell cambiata in ' + preferredShell + ' — riavvio...]\x1b[0m\r\n');
+        setTimeout(() => createPtyForPane(activePane), 300);
+      }
+    });
+  }
+
+  async function refreshEnvBadge() {
+    if (!statusNpm) return;
+    if (!window.electronAPI || !window.electronAPI.terminalEnvCheck) {
+      statusNpm.textContent = 'Node: ?';
+      return;
+    }
+    try {
+      const r = await window.electronAPI.terminalEnvCheck();
+      const n = r && r.node && r.node.ok ? r.node.version : 'assente';
+      const m = r && r.npm && r.npm.ok ? r.npm.version : 'assente';
+      statusNpm.textContent = 'Node ' + n + ' · npm ' + m;
+      statusNpm.style.color = (r && r.node.ok && r.npm.ok) ? 'rgba(0,255,136,0.8)' : 'rgba(255,200,0,0.8)';
+      if ((!r || !r.node.ok) && typeof window !== 'undefined') {
+        statusNpm.title = 'Node.js non trovato nel PATH — installalo da nodejs.org, poi riapri il terminale';
+      }
+    } catch (e) {
+      statusNpm.textContent = 'Node: ?';
+    }
+  }
 
   // ── xterm Theme ────────────────────────────────────────────────────
   const termTheme = {
@@ -50,7 +120,7 @@
     foreground: '#c4d1f5',
     cursor: '#00f3ff',
     cursorAccent: '#0a0c12',
-    selectionBackground: 'rgba(0, 243, 255, 0.2)',
+    selectionBackground: 'rgba(255, 171, 46, 0.2)',
     black: '#1e2130',
     red: '#ff3c3c',
     green: '#00ff88',
@@ -272,14 +342,32 @@
   }
 
   async function createPtyForPane(pane) {
-    if (!window.electronAPI || !window.electronAPI.terminalPtyCreate) return;
+    if (!window.electronAPI || !window.electronAPI.terminalPtyCreate) {
+      pane.term.writeln('\r\n\x1b[31m[ponte IPC non disponibile]\x1b[0m');
+      return;
+    }
 
     const cols = pane.term.cols || 120;
     const rows = pane.term.rows || 30;
 
-    const result = await window.electronAPI.terminalPtyCreate({ cols, rows });
+    let result;
+    try {
+      result = await window.electronAPI.terminalPtyCreate({ cols, rows, shell: preferredShell || undefined });
+    } catch (e) {
+      pane.term.writeln('\r\n\x1b[31m[errore creazione shell: ' + ((e && e.message) || e) + ']\x1b[0m');
+      return;
+    }
+    if (!result || !result.success) {
+      pane.term.writeln('\r\n\x1b[31m[avvio shell fallito: ' + ((result && result.error) || 'sconosciuto') + ']\x1b[0m');
+      return;
+    }
     if (result.success) {
       pane.ptyId = result.ptyId;
+      pane.shellId = result.shellId || preferredShell || 'default';
+      if (pane.container) {
+        const title = pane.container.querySelector('.pane-header-title');
+        if (title) title.textContent = (result.shellId || 'shell') + ' // ' + pane.id;
+      }
 
       // Write handler: xterm -> PTY
       pane.term.onData((data) => {
@@ -372,7 +460,7 @@
 
     // Update pane header highlight
     document.querySelectorAll('.split-pane').forEach(p => p.style.outline = 'none');
-    if (pane.container) pane.container.style.outline = '1px solid rgba(0, 243, 255, 0.3)';
+    if (pane.container) pane.container.style.outline = '1px solid rgba(255, 171, 46, 0.3)';
   }
 
   function focusPaneRelative(direction) {
@@ -394,21 +482,27 @@
 
   // ── Status Bar ─────────────────────────────────────────────────────
   function updateStatus() {
-    statusTabs.textContent = 'TABS: ' + tabs.length;
+    statusTabs.textContent = tabs.length + ' tab';
     let totalPanes = 0;
     tabs.forEach(t => totalPanes += t.panes.length);
-    statusPanes.textContent = 'PANES: ' + totalPanes;
+    statusPanes.textContent = totalPanes + ' pannelli';
 
     if (activePane) {
-      statusFocus.textContent = 'FOCUS: ' + activePane.id;
+      statusFocus.textContent = activePane.id;
       if (activePane.ptyId && window.electronAPI) {
         window.electronAPI.terminalPtyCwd(activePane.ptyId).then(r => {
-          if (r.success) statusCwd.textContent = 'CWD: ' + r.cwd;
+          if (r.success) statusCwd.textContent = r.cwd;
         }).catch(() => {});
       }
     } else {
-      statusFocus.textContent = 'FOCUS: —';
-      statusCwd.textContent = 'CWD: —';
+      statusFocus.textContent = '—';
+      statusCwd.textContent = '—';
+    }
+  }
+
+  function runInActivePane(cmd) {
+    if (activePane && activePane.ptyId && window.electronAPI && window.electronAPI.terminalPtyWrite) {
+      window.electronAPI.terminalPtyWrite(activePane.ptyId, cmd + '\n');
     }
   }
 
@@ -424,7 +518,29 @@
     { icon: 'fa-chevron-down', label: 'Focus Down', shortcut: 'Alt+↓', action: () => focusPaneRelative('down') },
     { icon: 'fa-folder-open', label: 'Open in Explorer', shortcut: '', action: () => openCurrentDirInExplorer() },
     { icon: 'fa-trash-alt', label: 'Clear Pane', shortcut: '', action: () => { if (activePane && activePane.term) activePane.term.clear(); } },
+    { icon: 'fa-check-circle', label: 'Check node + npm version', shortcut: 'npm', action: () => runInActivePane('node --version && npm --version') },
+    { icon: 'fa-download', label: 'Install CLI: opencode', shortcut: 'npm', action: () => runInActivePane('npm i -g opencode-ai') },
+    { icon: 'fa-download', label: 'Install CLI: Copilot', shortcut: 'npm', action: () => runInActivePane('npm i -g @github/copilot') },
+    { icon: 'fa-download', label: 'Install CLI: Gemini', shortcut: 'npm', action: () => runInActivePane('npm i -g @google/gemini-cli') },
+    { icon: 'fa-download', label: 'Install CLI: Codex', shortcut: 'npm', action: () => runInActivePane('npm i -g @openai/codex') },
   ];
+
+  // Voci dinamiche "New Tab with <shell>" aggiunte quando gli shell sono noti
+  function appendShellPaletteEntries() {
+    for (const s of availableShells) {
+      if (!s.available) continue;
+      if (commands.some(c => c.label === 'New Tab with ' + s.label)) continue;
+      commands.push({
+        icon: 'fa-terminal', label: 'New Tab with ' + s.label, shortcut: s.id,
+        action: ((id) => () => {
+          preferredShell = id;
+          try { localStorage.setItem('savia-term-shell', preferredShell); } catch (e) {}
+          if (shellSelect) shellSelect.value = id;
+          createTab();
+        })(s.id)
+      });
+    }
+  }
 
   function openCurrentDirInExplorer() {
     if (activePane && activePane.ptyId && window.electronAPI) {
@@ -599,6 +715,8 @@
   });
 
   // ── Init ───────────────────────────────────────────────────────────
+  refreshShellList().then(() => refreshEnvBadge());
+  setTimeout(refreshEnvBadge, 4000);
   createTab('Terminal 1');
 
   // Window controls
@@ -694,8 +812,74 @@
   });
   document.addEventListener('savia-terminal-open-explorer', () => openCurrentDirInExplorer());
   document.addEventListener('savia-terminal-voice-request', () => {
-    // Trigger voice capture from terminal page
-    document.dispatchEvent(new CustomEvent('savia-terminal-voice-request'));
+    terminalVoiceOnce();
   });
+
+  // Cattura vocale one-shot nella pagina terminale (Whisper locale):
+  // il testo trascritto viene eseguito nel pane attivo oppure inoltrato
+  // alla chat AI di index.html se non è un comando da terminale.
+  let termVoiceBusy = false;
+  function terminalVoiceOnce() {
+    if (termVoiceBusy) return;
+    if (!window.LocalSTT || !window.LocalSTT.supported || !window.LocalSTT.supported()) {
+      if (activePane && activePane.term) {
+        activePane.term.writeln('\r\n\x1b[38;5;245m[Voce non disponibile: microfono/STT non accessibili]\x1b[0m');
+      }
+      return;
+    }
+    termVoiceBusy = true;
+    if (activePane && activePane.term) {
+      activePane.term.writeln('\r\n\x1b[38;5;51m[Ascolto... parla ora (max 12s)]\x1b[0m');
+    }
+    window.LocalSTT.ensureModel().catch(() => {});
+    window.LocalSTT.start({
+      onUtterance: (text) => {
+        termVoiceBusy = false;
+        text = (text || '').trim();
+        if (!text) {
+          if (activePane && activePane.term) activePane.term.writeln('\x1b[38;5;245m[Nessun parlato rilevato]\x1b[0m');
+          return;
+        }
+        if (activePane && activePane.term) {
+          activePane.term.writeln('\x1b[38;5;51m[Hai detto: ' + text + ']\x1b[0m');
+        }
+        // "esegui <comando>" → esegue nel pane; altrimenti inoltra alla chat AI
+        const m = text.match(/^(?:esegui|run|avvia|launch|exec|execute)\s+(.+)/i);
+        if (m && m[1]) {
+          handleTerminalVoiceAction({ type: 'execute', command: m[1] });
+        } else if (window.electronAPI && window.electronAPI.sendVoiceFromPage) {
+          window.electronAPI.sendVoiceFromPage({ command: text, page: 'terminal.html' });
+          if (activePane && activePane.term) {
+            activePane.term.writeln('\x1b[38;5;245m[Inoltrato alla chat AI di S.A.V.I.A]\x1b[0m');
+          }
+        } else {
+          handleTerminalVoiceAction({ type: 'execute', command: text });
+        }
+      },
+      onStatus: () => {}
+    }).catch(() => { termVoiceBusy = false; });
+  }
+
+  // ── Diagnostica esposta (console / test): window.saviaTermDiag() ──
+  window.saviaTermDiag = async function () {
+    const d = {
+      xterm: !!window.Terminal,
+      fitAddon: !!(window.FitAddon && window.FitAddon.FitAddon),
+      tabs: tabs.length,
+      panes: tabs.reduce((n, t) => n + t.panes.length, 0),
+      activePty: activePane ? activePane.ptyId : null,
+      shell: preferredShell,
+      ipc: !!(window.electronAPI && window.electronAPI.terminalPtyCreate),
+      ptyCreate: null,
+      write: null
+    };
+    try {
+      if (activePane && activePane.ptyId && window.electronAPI) {
+        const r = await window.electronAPI.terminalPtyWrite(activePane.ptyId, 'echo SAVIA_TERM_DIAG_OK\r');
+        d.write = !!(r && r.success);
+      }
+    } catch (e) { d.write = 'ERR:' + e.message; }
+    return d;
+  };
 
 })();

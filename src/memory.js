@@ -89,7 +89,7 @@ async function scanProjects() {
   }
   if (!memScanBtn) return;
   memScanBtn.classList.add('scanning');
-  memScanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SCANNING...';
+  memScanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scansione…';
   try {
     const result = await window.electronAPI.memoryScanProjects();
     if (result.success && result.projects) {
@@ -111,7 +111,7 @@ async function scanProjects() {
     if (memProjectsList) memProjectsList.innerHTML = '<div class="mem-item"><span class="mem-item-name" style="color:var(--accent-red);font-style:italic;">Errore: ' + e.message + '</span></div>';
   }
   memScanBtn.classList.remove('scanning');
-  memScanBtn.innerHTML = '<i class="fas fa-sync-alt"></i> SCAN PROJECTS';
+  memScanBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Scansiona progetti';
 }
 
 if (memScanBtn) {

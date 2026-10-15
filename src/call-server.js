@@ -28,8 +28,10 @@ const DEFAULTS = {
   sttModel: 'Xenova/whisper-tiny',
   sttCacheDir: null,                    // impostata da main con userData
   sttLanguage: 'italian',
-  brainHost: 'http://localhost:11434',
-  brainModel: 'mistral',
+  brainBaseUrl: 'https://api.xkiro.com/v1',
+  brainApiKey: '',
+  brainHost: 'https://api.xkiro.com/v1', // alias legacy (era localhost:11434)
+  brainModel: 'qwen/qwen3.7-max:free',
   brainSystemPrompt: null,
   elevenLabsKey: '',
   elevenLabsVoiceId: '',
@@ -48,7 +50,15 @@ let tunnelStatus = 'off';
 let activeSessions = new Map();
 let onEvent = null; // callback (event, payload) verso main → UI
 
-function setConfig(patch) { cfg = { ...cfg, ...(patch || {}) }; }
+function setConfig(patch) {
+  cfg = { ...cfg, ...(patch || {}) };
+  // Retrocompat: il vecchio brainHost ollama (localhost:11434) viene mappato su xKiro
+  if (patch && patch.brainHost && /localhost|11434|ollama/i.test(patch.brainHost) && !(patch.brainBaseUrl || patch.brainApiKey)) {
+    cfg.brainBaseUrl = 'https://api.xkiro.com/v1';
+    cfg.brainHost = 'https://api.xkiro.com/v1';
+  }
+  if (patch && patch.brainModel === 'mistral') cfg.brainModel = 'qwen/qwen3.7-max:free';
+}
 function setEventSink(cb) { onEvent = cb; }
 function emit(type, payload) {
   if (onEvent) { try { onEvent(type, payload); } catch (e) { /* ignore */ } }
@@ -181,8 +191,18 @@ async function transcribe(pcm16) {
 }
 
 // ============================================================
-// CERVELLO — AI
+// CERVELLO — AI via xKiro (OpenAI-compatible /v1/chat/completions)
 // ============================================================
+function brainBase() {
+  const b = cfg.brainBaseUrl || cfg.brainHost || 'https://api.xkiro.com/v1';
+  if (/localhost|11434|ollama/i.test(b)) return 'https://api.xkiro.com/v1';
+  return String(b).replace(/\/$/, '');
+}
+
+function brainKey() {
+  return cfg.brainApiKey || process.env.XKIRO_API_KEY || '';
+}
+
 async function askBrain(session, text) {
   const messages = [
     { role: 'system', content: cfg.brainSystemPrompt || 'You are S.A.V.I.A., a cybernetic AI assistant. Reply concisely, in the language of the user, with a sharp JARVIS tone.' },
@@ -191,16 +211,18 @@ async function askBrain(session, text) {
   ];
 
   try {
-    const res = await fetch(cfg.brainHost + '/api/chat', {
+    const key = brainKey();
+    if (!key) throw new Error('chiave xKiro mancante (xkiroApiKey)');
+    const res = await fetch(brainBase() + '/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: cfg.brainModel, messages, stream: false })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model: cfg.brainModel, messages, stream: false, max_tokens: 300 })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    let reply = (data.message && data.message.content ? data.message.content : '').trim();
+    let reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
     reply = reply.replace(/\[ACTION:[^\]]*\]/gi, '').replace(/\[TOOL\][\s\S]*$/gi, '').replace(/\*\*/g, '').trim();
-    return reply;
+    return reply || 'Ricevuto, sir — ma la risposta è arrivata vuota. Riprova.';
   } catch (e) {
     emit('call', { type: 'error', message: 'AI unreachable: ' + e.message });
     return 'Il mio cervello neurale è momentaneamente offline. Riprova tra poco, sir.';

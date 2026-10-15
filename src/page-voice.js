@@ -1,22 +1,29 @@
 /**
  * S.A.V.I.A - Lightweight Page Voice Listener
- * Loads on ALL pages. Listens for voice commands via SpeechRecognition
- * and forwards them to index.html via IPC for processing by the full
- * voice-control.js (wake word, action dispatch, AI chat).
+ * Loads on ALL secondary pages. Listens for voice commands and forwards them
+ * to index.html via IPC for processing by the full voice-control.js
+ * (wake word, action dispatch, AI chat).
  *
- * This file is intentionally minimal — no wake word, no TTS, no state machine.
+ * Engine order: Web Speech API (cloud) → Whisper locale via LocalSTT (offline).
+ * This file is intentionally minimal — no TTS, no state machine.
  * Just STT → IPC → index.html handles everything.
  */
 (function () {
   'use strict';
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
   if (!window.electronAPI || !window.electronAPI.sendVoiceFromPage) return;
 
   // Don't double-init on index.html (it has full voice-control.js)
   const page = (window.location.pathname.split('/').pop() || '').toLowerCase();
   if (page === 'index.html' || page === '' || page === '/') return;
+
+  const hasLocal = !!(window.LocalSTT && window.LocalSTT.supported && window.LocalSTT.supported());
+  if (!SR && !hasLocal) return;
+
+  function useLocalEngine() {
+    return !SR && hasLocal;
+  }
 
   let recognition = null;
   let listening = false;
@@ -63,7 +70,7 @@
     fab = document.createElement('div');
     fab.id = 'savia-page-voice-fab';
     fab.innerHTML = '<i class="fas fa-microphone"></i>';
-    fab.title = 'S.A.V.I.A Voice — click to toggle';
+    fab.title = 'Voce — tocca per attivare o silenziare';
     Object.assign(fab.style, {
       position: 'fixed',
       bottom: '20px',
@@ -102,7 +109,8 @@
     }
   }
 
-  function startListening() {
+  // ── Cloud path (Web Speech API) ──────────────────────────────────────
+  function startCloudListening() {
     if (listening) return;
     releaseRecognizer();
 
@@ -145,6 +153,13 @@
         updateFabState();
         return;
       }
+      // Rete inaffidabile (tipico su protocollo savia://) → Whisper locale
+      if (err.error === 'network' && hasLocal) {
+        releaseRecognizer();
+        active = true;
+        startLocalListening();
+        return;
+      }
       // Auto-restart on other errors
       if (active) {
         listening = false;
@@ -166,6 +181,39 @@
     }
   }
 
+  // ── Local path (Whisper via main process) ────────────────────────────
+  function startLocalListening() {
+    if (listening || !hasLocal) return;
+    window.LocalSTT.ensureModel().catch(() => {});
+    window.LocalSTT.start({
+      onUtterance: function (text) {
+        if (!text) { if (active) setTimeout(startListening, 250); return; }
+        if (containsWakeWord(text)) {
+          const command = extractCommand(text);
+          if (command && command.length > 1) forwardCommand(command);
+        } else if (text.trim().length > 1) {
+          // Senza wake word, inoltra comunque: index.html decide il routing
+          forwardCommand(text.trim());
+        }
+        if (active) setTimeout(startListening, 250);
+      },
+      onStatus: function () {}
+    }).then(function () {
+      listening = true;
+      active = true;
+      updateFabState();
+    }).catch(function () {
+      listening = false;
+      if (active) setTimeout(startListening, 800);
+    });
+  }
+
+  function startListening() {
+    if (listening) return;
+    if (useLocalEngine() || (hasLocal && !SR)) { startLocalListening(); return; }
+    startCloudListening();
+  }
+
   function stopListening() {
     active = false;
     releaseRecognizer();
@@ -185,6 +233,7 @@
       try { recognition.onend = null; recognition.abort(); } catch (e) {}
       recognition = null;
     }
+    if (window.LocalSTT) { try { window.LocalSTT.stop(); } catch (e) {} }
     listening = false;
   }
 

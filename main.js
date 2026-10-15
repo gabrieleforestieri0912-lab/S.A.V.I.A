@@ -67,8 +67,8 @@ function sendToAll(channel, payload) {
 }
 
 const TOOL_PAGES = new Set([
-  'terminal.html', 'calendar.html', 'objectives.html', 'imagine.html',
-  'particles.html', 'globe.html', 'knowledge.html', 'youtube.html',
+  'terminal.html', 'calendar.html',
+  'particles.html', 'globe.html', 'knowledge.html',
   'hotline.html', 'proximity.html', 'face-training.html', 'mcp.html',
   'news.html', 'editor.html', 'stats.html'
 ]);
@@ -96,7 +96,10 @@ function hotlineApplyConfig() {
     elevenLabsVoiceId: cfg.hotlineVoiceId || '',
     twilioAccountSid: cfg.twilioAccountSid || '',
     twilioAuthToken: cfg.twilioAuthToken || '',
-    twilioPhoneNumber: cfg.twilioPhoneNumber || ''
+    twilioPhoneNumber: cfg.twilioPhoneNumber || '',
+    brainBaseUrl: 'https://api.xkiro.com/v1',
+    brainApiKey: cfg.xkiroApiKey || cfg.openrouterApiKey || process.env.XKIRO_API_KEY || '',
+    brainModel: cfg.activeModel || 'qwen/qwen3.7-max:free'
   });
 }
 
@@ -125,9 +128,11 @@ ipcMain.handle('call-hotline-config', (event, patch) => {
 });
 
 ipcMain.handle('call-hotline-brain', (event, brain) => {
+  const cfg = loadConfig();
   callServer.setConfig({
-    brainHost: (brain && brain.aiHost) || 'http://localhost:11434',
-    brainModel: (brain && brain.model) || 'mistral',
+    brainBaseUrl: 'https://api.xkiro.com/v1',
+    brainApiKey: cfg.xkiroApiKey || cfg.openrouterApiKey || process.env.XKIRO_API_KEY || '',
+    brainModel: (brain && brain.model) || cfg.activeModel || 'qwen/qwen3.7-max:free',
     brainSystemPrompt: (brain && brain.systemPrompt) || null
   });
   return callServer.status();

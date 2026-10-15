@@ -154,7 +154,7 @@ try {
 
 function isAdminSync() {
   try {
-    execSync('net session', { windowsHide: true, timeout: 3000 });
+    execSync('net session', { windowsHide: true, timeout: 3000, stdio: ['ignore', 'pipe', 'pipe'] });
     return true;
   } catch { return false; }
 }

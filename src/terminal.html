@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
+  <link rel="stylesheet" href="lib/xterm.css">
   <link rel="stylesheet" href="style.css">
   <style>
     body { overflow: hidden; display: flex; flex-direction: column; height: 100vh; margin: 0; }
@@ -19,7 +19,7 @@
       gap: 4px;
       padding: 4px 10px;
       background: rgba(10, 12, 18, 0.95);
-      border-bottom: 1px solid rgba(0, 243, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 171, 46, 0.1);
       flex-shrink: 0;
       z-index: 100;
     }
@@ -48,8 +48,8 @@
       font-size: 11px;
       transition: all 0.15s;
     }
-    .ttb-btn:hover { background: rgba(0, 243, 255, 0.1); border-color: var(--accent-cyan); color: #fff; }
-    .ttb-btn.active { background: rgba(0, 243, 255, 0.15); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+    .ttb-btn:hover { background: rgba(255, 171, 46, 0.1); border-color: var(--accent-cyan); color: #fff; }
+    .ttb-btn.active { background: rgba(255, 171, 46, 0.15); border-color: var(--accent-cyan); color: var(--accent-cyan); }
     .ttb-btn.danger:hover { background: rgba(255, 60, 60, 0.15); border-color: var(--accent-red); color: var(--accent-red); }
 
     .ttb-label {
@@ -65,7 +65,7 @@
       display: flex;
       align-items: stretch;
       background: rgba(8, 10, 16, 0.98);
-      border-bottom: 1px solid rgba(0, 243, 255, 0.08);
+      border-bottom: 1px solid rgba(255, 171, 46, 0.08);
       overflow-x: auto;
       flex-shrink: 0;
       height: 32px;
@@ -89,7 +89,7 @@
     }
     .term-tab:hover { background: rgba(255, 255, 255, 0.03); color: rgba(255, 255, 255, 0.6); }
     .term-tab.active {
-      background: rgba(0, 243, 255, 0.06);
+      background: rgba(255, 171, 46, 0.06);
       color: var(--accent-cyan);
       border-bottom: 2px solid var(--accent-cyan);
     }
@@ -114,7 +114,7 @@
       font-size: 14px;
       transition: all 0.15s;
     }
-    .term-tab-add:hover { color: var(--accent-cyan); background: rgba(0, 243, 255, 0.06); }
+    .term-tab-add:hover { color: var(--accent-cyan); background: rgba(255, 171, 46, 0.06); }
 
     /* ── Split Container ─────────────────────────────── */
     .split-container {
@@ -138,7 +138,7 @@
 
     .split-divider {
       flex-shrink: 0;
-      background: rgba(0, 243, 255, 0.08);
+      background: rgba(255, 171, 46, 0.08);
       transition: background 0.15s;
       z-index: 10;
     }
@@ -158,7 +158,7 @@
       justify-content: space-between;
       padding: 4px 10px;
       background: rgba(0, 0, 0, 0.3);
-      border-bottom: 1px solid rgba(0, 243, 255, 0.06);
+      border-bottom: 1px solid rgba(255, 171, 46, 0.06);
       flex-shrink: 0;
       height: 28px;
     }
@@ -198,7 +198,7 @@
       justify-content: space-between;
       padding: 2px 12px;
       background: rgba(10, 12, 18, 0.95);
-      border-top: 1px solid rgba(0, 243, 255, 0.08);
+      border-top: 1px solid rgba(255, 171, 46, 0.08);
       font-family: var(--font-mono);
       font-size: 10px;
       color: rgba(255, 255, 255, 0.3);
@@ -231,9 +231,9 @@
       width: 500px;
       max-height: 400px;
       background: rgba(12, 14, 22, 0.98);
-      border: 1px solid rgba(0, 243, 255, 0.2);
+      border: 1px solid rgba(255, 171, 46, 0.2);
       border-radius: 8px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 243, 255, 0.05);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 171, 46, 0.05);
       overflow: hidden;
     }
 
@@ -241,7 +241,7 @@
       width: 100%;
       background: transparent;
       border: none;
-      border-bottom: 1px solid rgba(0, 243, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 171, 46, 0.1);
       color: #fff;
       font-family: var(--font-mono);
       font-size: 14px;
@@ -256,7 +256,7 @@
       padding: 6px;
     }
     .cmd-palette-list::-webkit-scrollbar { width: 4px; }
-    .cmd-palette-list::-webkit-scrollbar-thumb { background: rgba(0, 243, 255, 0.2); border-radius: 2px; }
+    .cmd-palette-list::-webkit-scrollbar-thumb { background: rgba(255, 171, 46, 0.2); border-radius: 2px; }
 
     .cmd-palette-item {
       display: flex;
@@ -268,7 +268,7 @@
       transition: all 0.1s;
     }
     .cmd-palette-item:hover, .cmd-palette-item.selected {
-      background: rgba(0, 243, 255, 0.08);
+      background: rgba(255, 171, 46, 0.08);
     }
     .cmd-palette-item .cmd-icon {
       width: 20px;
@@ -298,10 +298,10 @@
       <span class="system-version">v4.0.0</span>
     </div>
     <div class="header-center">
-      <span class="breadcrumb">SYSTEM_ROOT // TERMINAL // MULTI_PANE</span>
+      <span class="breadcrumb">Savia · Terminale</span>
     </div>
     <div class="header-right">
-      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> AI CHAT</button>
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> Chat</button>
       <div class="window-controls">
         <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
         <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
@@ -311,7 +311,13 @@
   </header>
 
   <div class="term-toolbar">
-    <span class="ttb-label">TERMINAL</span>
+    <span class="ttb-label">Shell</span>
+    <div class="term-toolbar-group">
+      <select id="shell-select" class="ttb-shell-select" title="Tipo di terminale (shell)" style="background:rgba(10,12,18,0.95);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);font-family:var(--font-mono);font-size:10px;border-radius:4px;height:26px;padding:0 6px;cursor:pointer;max-width:150px;">
+        <option value="">shell…</option>
+      </select>
+    </div>
+    <div class="term-toolbar-sep"></div>
     <div class="term-toolbar-group">
       <button class="ttb-btn" id="btn-new-tab" title="New Tab (Ctrl+T)"><i class="fas fa-plus"></i></button>
       <button class="ttb-btn danger" id="btn-close-tab" title="Close Tab (Ctrl+W)"><i class="fas fa-times"></i></button>
@@ -345,11 +351,12 @@
 
   <div class="term-status-bar">
     <div class="status-left">
-      <div class="status-item"><span class="status-dot green"></span> PTY ACTIVE</div>
+      <div class="status-item"><span class="status-dot green"></span> Attivo</div>
       <div class="status-item" id="status-tabs">TABS: 1</div>
       <div class="status-item" id="status-panes">PANES: 1</div>
     </div>
     <div class="status-right">
+      <div class="status-item" id="status-npm" title="Versioni rilevate nel terminale">Node …</div>
       <div class="status-item" id="status-focus">FOCUS: —</div>
       <div class="status-item" id="status-cwd">CWD: —</div>
     </div>
@@ -365,12 +372,13 @@
 
   <div id="hud-scanlines"></div>
 
-  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
-  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
-  <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+  <script src="lib/xterm.js"></script>
+  <script src="lib/addon-fit.js"></script>
+  <script src="lib/addon-web-links.js"></script>
   <script src="shared.js"></script>
   <script src="telemetry.js"></script>
   <script src="commander.js"></script>
+  <script src="stt-local.js"></script>
   <script src="page-voice.js"></script>
   <script src="nav-windows.js"></script>
 </body>

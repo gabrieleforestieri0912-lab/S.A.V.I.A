@@ -1,8 +1,0 @@
-node_modules/
-dist/
-logs/
-*.log
-health-state.json
-.env
-.env.local
-!.env.example

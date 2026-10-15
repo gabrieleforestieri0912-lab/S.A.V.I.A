@@ -820,7 +820,7 @@ function renderCityMiniForecast(forecast) {
   container.innerHTML = '';
   const list = (forecast && Array.isArray(forecast)) ? forecast : [];
   if (list.length === 0) {
-    container.innerHTML = '<div style="padding:6px 8px;font-size:9px;color:rgba(255,255,255,0.3);">FORECAST: LOADING...</div>';
+    container.innerHTML = '<div style="padding:6px 8px;font-size:9px;color:rgba(255,255,255,0.3);">Caricamento…</div>';
     return;
   }
   list.forEach((f, i) => {
@@ -895,7 +895,7 @@ function drawHandConnections(ctx, landmarks, image) {
     [0, 9], [9, 10], [10, 11], [11, 12], [0, 13], [13, 14], [14, 15], [15, 16],
     [0, 17], [17, 18], [18, 19], [19, 20], [5, 9], [9, 13], [13, 17],
   ];
-  ctx.strokeStyle = '#00f3ff';
+  ctx.strokeStyle = '#ffab2e';
   ctx.lineWidth = 3;
   ctx.lineJoin = 'round';
   connections.forEach(([start, end]) => {

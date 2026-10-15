@@ -9,6 +9,12 @@ function initEditor() {
     return;
   }
 
+  if (!window.require) {
+    // CDN Monaco non ancora pronto (o offline): riprova a momenti
+    setTimeout(function () { if (!editorInitialized) initEditor(); }, 500);
+    return;
+  }
+
   require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
 
   require(['vs/editor/editor.main'], function () {

@@ -60,7 +60,7 @@ function renderStatus(s) {
   if (!s) return;
   const on = !!s.running;
   setDot(dotService, on ? 'hl-on' : 'hl-off');
-  lblService.textContent = on ? 'SCANNING' : 'OFF';
+  lblService.textContent = on ? 'Attivo' : 'Spento';
   const be = s.backend || 'stopped';
   lblBackend.textContent = be;
   lblBackend.style.color = be === 'up' ? '#00ff88' : be === 'missing-deps' || be === 'error' ? 'var(--accent-red)' : 'var(--accent-gold)';

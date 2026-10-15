@@ -27,7 +27,7 @@
     .hl-field { display: flex; flex-direction: column; gap: 4px; }
     .hl-field label { font-family: var(--font-hud); font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.4); }
     .hl-field input { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--accent-cyan); font-family: var(--font-mono); font-size: 12px; padding: 8px 10px; border-radius: 4px; outline: none; }
-    .hl-field input:focus { border-color: var(--accent-cyan); box-shadow: 0 0 8px rgba(0,243,255,0.15); }
+    .hl-field input:focus { border-color: var(--accent-cyan); box-shadow: 0 0 8px rgba(255,171,46,0.15); }
     .hl-btns { display: flex; gap: 10px; flex-wrap: wrap; }
     .hl-btns button { flex: 1; min-width: 120px; }
     .hl-btns button.wide { flex: 1 1 100%; }
@@ -52,7 +52,7 @@
     </div>
     <div class="header-center">CALL_HOTLINE // TWILIO // STT_WHISPER_LOCAL</div>
     <div class="header-right">
-      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> Chat</button>
       <div id="clock-display">00:00:00</div>
       <div class="window-controls">
         <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
@@ -155,6 +155,7 @@
   </main>
 
   <script src="hotline.js"></script>
+  <script src="stt-local.js"></script>
   <script src="page-voice.js"></script>
   <script src="nav-windows.js"></script>
 </body>

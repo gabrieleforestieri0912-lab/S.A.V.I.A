@@ -25,7 +25,7 @@
     .px-field { display: flex; flex-direction: column; gap: 4px; }
     .px-field label { font-family: var(--font-hud); font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.4); }
     .px-field input, .px-field select { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--accent-cyan); font-family: var(--font-mono); font-size: 12px; padding: 8px 10px; border-radius: 4px; outline: none; }
-    .px-field input:focus, .px-field select:focus { border-color: var(--accent-cyan); box-shadow: 0 0 8px rgba(0,243,255,0.15); }
+    .px-field input:focus, .px-field select:focus { border-color: var(--accent-cyan); box-shadow: 0 0 8px rgba(255,171,46,0.15); }
     .px-btns { display: flex; gap: 10px; flex-wrap: wrap; }
     .px-btns button { flex: 1; min-width: 120px; }
     .px-check { display: flex; align-items: center; gap: 8px; font-family: var(--font-hud); font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.5); cursor: pointer; }
@@ -38,7 +38,7 @@
     .px-log .ln-warn { color: var(--accent-gold); }
     .px-log .ln-error { color: var(--accent-red); }
     .px-dev { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 8px 10px; font-size: 11px; }
-    .px-dev:hover { border-color: rgba(0,243,255,0.4); }
+    .px-dev:hover { border-color: rgba(255,171,46,0.4); }
     .px-rssi-box { width: 130px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
     .px-rssi-fill { height: 100%; background: linear-gradient(90deg, #00ff88, var(--accent-cyan)); }
     .px-known { display: flex; flex-direction: column; gap: 8px; }
@@ -49,8 +49,8 @@
     .px-kmeta { font-size: 9px; color: rgba(255,255,255,0.3); }
     .px-kcontrols { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
     .px-kcontrols input { width: 110px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--accent-cyan); font-size: 11px; padding: 5px 7px; border-radius: 3px; }
-    .px-mini-btn { background: rgba(0,243,255,0.08); border: 1px solid rgba(0,243,255,0.3); color: var(--accent-cyan); font-family: var(--font-hud); font-size: 9px; letter-spacing: 1px; padding: 4px 8px; border-radius: 3px; cursor: pointer; }
-    .px-mini-btn:hover { background: rgba(0,243,255,0.2); }
+    .px-mini-btn { background: rgba(255,171,46,0.08); border: 1px solid rgba(255,171,46,0.3); color: var(--accent-cyan); font-family: var(--font-hud); font-size: 9px; letter-spacing: 1px; padding: 4px 8px; border-radius: 3px; cursor: pointer; }
+    .px-mini-btn:hover { background: rgba(255,171,46,0.2); }
     .px-mini-btn.danger { border-color: rgba(255,80,100,0.4); color: var(--accent-red); background: rgba(255,80,100,0.08); }
     .px-mini-btn.green { border-color: rgba(0,255,136,0.4); color: #00ff88; background: rgba(0,255,136,0.08); }
     .px-slider { width: 100%; accent-color: #00ff88; }
@@ -68,7 +68,7 @@
     </div>
     <div class="header-center">PROXIMITY // BLE_RSSI // ADB_UNLOCK</div>
     <div class="header-right">
-      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> Chat</button>
       <div id="clock-display">00:00:00</div>
       <div class="window-controls">
         <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
@@ -155,6 +155,7 @@
   </main>
 
   <script src="proximity.js"></script>
+  <script src="stt-local.js"></script>
   <script src="page-voice.js"></script>
   <script src="nav-windows.js"></script>
 </body>

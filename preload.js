@@ -60,6 +60,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // COMMAND CENTER — TERMINAL (PTY-based)
   // ============================================================
   terminalPtyCreate: (opts) => ipcRenderer.invoke('terminal-pty-create', opts),
+  terminalPtyShells: () => ipcRenderer.invoke('terminal-shells'),
+  terminalEnvCheck: () => ipcRenderer.invoke('terminal-env-check'),
   terminalPtyWrite: (ptyId, data) => ipcRenderer.invoke('terminal-pty-write', { ptyId, data }),
   terminalPtyResize: (ptyId, cols, rows) => ipcRenderer.invoke('terminal-pty-resize', { ptyId, cols, rows }),
   terminalPtyKill: (ptyId) => ipcRenderer.invoke('terminal-pty-kill', { ptyId }),

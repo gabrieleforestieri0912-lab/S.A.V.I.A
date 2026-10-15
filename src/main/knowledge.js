@@ -11,7 +11,45 @@ const { execSync } = require('child_process');
 const { app, ipcMain } = require('electron');
 
 const kbPath = path.join(app.getPath('userData'), 'knowledge-base.json');
-const LOCAL_EMBED = 'http://localhost:11434/api/embeddings';
+// Embedding via xKiro (OpenAI-compatible /v1/embeddings). Se la chiave manca
+// o la rete fallisce, si usa un embedding hash locale (offline, sempre attivo)
+// così la RAG funziona comunque — niente più dipendenza da Ollama.
+const XKIRO_EMBED_URL = 'https://api.xkiro.com/v1/embeddings';
+const XKIRO_EMBED_MODEL = 'openai/text-embedding-3-small';
+
+function readXkiroKey() {
+  try {
+    const cfgFile = path.join(app.getPath('userData'), 'savia-config.json');
+    if (fs.existsSync(cfgFile)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
+      return cfg.xkiroApiKey || cfg.openrouterApiKey || '';
+    }
+  } catch (e) { /* ignore */ }
+  return process.env.XKIRO_API_KEY || '';
+}
+
+// Embedding deterministico offline (hashing trick, 384 dim, normalizzato).
+// Non è semantico come un vero modello, ma garantisce ricerca keyword/overlap
+// funzionante senza rete né Ollama.
+function hashEmbedding(text, dim = 384) {
+  const vec = new Array(dim).fill(0);
+  const tokens = String(text || '').toLowerCase().split(/[^a-z0-9à-ÿ]+/i).filter(t => t.length > 1);
+  for (const tok of tokens) {
+    let h1 = 2166136261, h2 = 5381;
+    for (let i = 0; i < tok.length; i++) {
+      h1 = Math.imul(h1 ^ tok.charCodeAt(i), 16777619);
+      h2 = Math.imul(h2 * 33, 1) ^ tok.charCodeAt(i);
+    }
+    const idx = Math.abs(h1) % dim;
+    const idx2 = Math.abs(h2) % dim;
+    vec[idx] += 1;
+    vec[idx2] += 0.5;
+  }
+  let norm = 0;
+  for (let i = 0; i < dim; i++) norm += vec[i] * vec[i];
+  norm = Math.sqrt(norm) || 1;
+  return vec.map(v => v / norm);
+}
 
 const KB_CHUNK_SIZE = 1500;
 const KB_CHUNK_OVERLAP = 200;
@@ -50,18 +88,26 @@ function chunkText(text, filepath, docId) {
 }
 
 async function embedText(text) {
-  try {
-    const res = await fetch(LOCAL_EMBED, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text', prompt: text.substring(0, 8000) })
-    });
-    if (!res.ok) throw new Error(`Embedding API: ${res.status}`);
-    const data = await res.json();
-    return data.embedding || [];
-  } catch (e) {
-    throw new Error(`Embedding failed: ${e.message}`);
+  const input = String(text || '').substring(0, 8000);
+  if (!input.trim()) throw new Error('Embedding failed: empty text');
+  const key = readXkiroKey();
+  if (key) {
+    try {
+      const res = await fetch(XKIRO_EMBED_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: XKIRO_EMBED_MODEL, input })
+      });
+      if (!res.ok) throw new Error(`Embedding API: ${res.status}`);
+      const data = await res.json();
+      const emb = data.data && data.data[0] && data.data[0].embedding;
+      if (emb && emb.length) return emb;
+      throw new Error('empty embedding');
+    } catch (e) {
+      // fallback offline sotto
+    }
   }
+  return hashEmbedding(input);
 }
 
 function cosineSimilarity(a, b) {
@@ -295,6 +341,7 @@ module.exports = {
   chunkText,
   cosineSimilarity,
   fileSignature,
+  hashEmbedding,
   KB_CHUNK_SIZE,
   KB_CHUNK_OVERLAP
 };

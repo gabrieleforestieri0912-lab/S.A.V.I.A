@@ -279,8 +279,9 @@ async function tickNewsWatch() {
   try {
     const r = await pollNewsOnce(cfg);
     for (const a of r.newItems) alertNews(a, cfg);
-    if (r.errors.length && typeof addTickerEvent === 'function') {
-      addTickerEvent('warn', `NEWS: ${r.errors.join(' · ')}`);
+    if (r.errors.length && r.newItems.length === 0 && typeof addTickerEvent === 'function') {
+      // Solo log, niente toast/notifica: i retry di rete sono frequenti e rumorosi
+      addTickerEvent('sys', `NEWS: ${r.errors.join(' · ')}`);
     }
   } catch (e) { /* ignore */ }
 }
@@ -443,8 +444,8 @@ function bindMonitorPanel() {
 }
 
 function bindNewsTabs() {
-  document.querySelectorAll('#news-tabs .yt-tab').forEach(t => t.addEventListener('click', () => {
-    document.querySelectorAll('#news-tabs .yt-tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('#news-tabs .nws-tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('#news-tabs .nws-tab').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     newsState.cat = t.dataset.cat || 'ALL';
     renderNewsFeed();
@@ -457,7 +458,7 @@ async function loadFeeds() {
   const statusText = document.getElementById('news-status-text');
   if (statusDot) statusDot.className = 'item-status checking';
   if (statusText) statusText.textContent = 'Ricerco le ultime notizie...';
-  if (feed) feed.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-pulse"></i> SCANSIONE NOTIZIE...</div>';
+  if (feed) feed.innerHTML = '<div class="yt-loading"><i class="fas fa-spinner fa-pulse"></i> Ricerca notizie…</div>';
   const res = await fetchFeed('ALL', newsState.sources);
   newsState.articles = res.articles;
   renderNewsFeed();

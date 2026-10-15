@@ -139,14 +139,18 @@ Esempi:
 "Crea un logo" → creativo
 "Come stai?" → auto`;
 
-    const model = typeof getActiveModel === 'function' ? getActiveModel() : 'nvidia/nemotron-3.5-lightning:free';
+    const model = typeof getActiveModel === 'function' ? getActiveModel() : 'qwen/qwen3.7-max:free';
     let cls = '';
 
-    const res = await fetch(`${openrouterBaseUrl}/chat/completions`, {
+    const base = (typeof getAiBaseUrl === 'function') ? getAiBaseUrl() : 'https://api.xkiro.com/v1';
+    const key = (typeof getAiApiKey === 'function') ? getAiApiKey() : '';
+    if (!key) return 'auto';
+
+    const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openrouterApiKey}`,
+        'Authorization': `Bearer ${key}`,
         'HTTP-Referer': 'https://github.com/savia',
         'X-Title': 'S.A.V.I.A'
       },
@@ -199,11 +203,7 @@ function getAgentPrompt() {
     '- particles_creation_mode, particles_physics, particles_wireframe\n' +
     '- particles_reset_scene, particles_screenshot\n' +
     '- particles_gesture_rotate, particles_gesture_create, particles_gesture_delete, particles_gesture_move\n' +
-    '- terminal_clear, terminal_kill, fb_refresh, fb_back, fb_forward, fb_up\n' +
-    '- navigate_objectives, navigate_calendar, navigate_imagine, navigate_youtube, yt_search\n' +
-    '- yt_playlist_add, yt_playlist_remove, yt_subscribe, yt_analyze\n' +
-    '- navigate_news\n' +
-    '- navigate_mcp\n' +
+    '- navigate_calendar, navigate_news, navigate_mcp\n' +
     '- kb_index, memory_scan_projects, open_logs\n\n';
 
   const mcpDocs = (typeof window !== 'undefined' && window.MCP_TOOL_DOCS) ? window.MCP_TOOL_DOCS : '';

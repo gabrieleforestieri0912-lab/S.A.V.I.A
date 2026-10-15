@@ -5,9 +5,8 @@
  * system-ops.js, che lo sovrascrive come da ordine di caricamento).
  */
 
-const YT_CMD_KEY = 'yt-cmd';
-
-const YT_CONTROL_PAGES = ['index.html', 'particles.html', 'terminal.html', 'knowledge.html', 'globe.html', 'objectives.html', 'imagine.html', 'calendar.html', 'youtube.html', 'face-training.html', 'hotline.html', 'proximity.html', 'mcp.html'];
+// Pagine dove le azioni di messaggistica sono disponibili
+const MSG_PAGES = ['index.html', 'particles.html', 'terminal.html', 'knowledge.html', 'globe.html', 'calendar.html', 'face-training.html', 'hotline.html', 'proximity.html', 'mcp.html'];
 
 function getCurrentPage() {
   const p = window.location.pathname.split('/').pop();
@@ -16,36 +15,24 @@ function getCurrentPage() {
 
 let actionPayload = '';
 
-// Invia un intento alla finestra di controllo YouTube via localStorage:
-// la finestra youtube.html (già aperta o da aprire) lo consuma con un storage event
-// oppure sulla prima lettura al DOMContentLoaded.
-function sendYtCommand(op) {
-  const payload = cleanActionPayload(actionPayload);
-  localStorage.setItem(YT_CMD_KEY, JSON.stringify({ op, payload, ts: Date.now() }));
-  window.saviaOpen('youtube.html');
-  addTickerEvent('yt', `YOUTUBE INTENT :: ${op}${payload ? ` — ${payload}` : ''}`);
-}
-
 const ACTION_MAP = {
   // ── Navigation ──
-  navigate_index:        { el: null, fn: () => { window.saviaOpen('index.html'); }, pages: ['particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_particles:    { el: null, fn: () => { window.saviaOpen('particles.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_terminal:     { el: null, fn: () => { window.saviaOpen('terminal.html'); }, pages: ['index.html','particles.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_knowledge:    { el: null, fn: () => { window.saviaOpen('knowledge.html'); }, pages: ['index.html','particles.html','terminal.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_globe:        { el: null, fn: () => { window.saviaOpen('globe.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_objectives:   { el: null, fn: () => { window.saviaOpen('objectives.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','imagine.html','calendar.html'] },
-  navigate_calendar:     { el: null, fn: () => { window.saviaOpen('calendar.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','imagine.html'] },
-  navigate_imagine:      { el: null, fn: () => { window.saviaOpen('imagine.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','youtube.html','objectives.html','calendar.html'] },
+  navigate_index:        { el: null, fn: () => { window.saviaOpen('index.html'); }, pages: ['particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
+  navigate_particles:    { el: null, fn: () => { window.saviaOpen('particles.html'); }, pages: ['index.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
+  navigate_terminal:     { el: null, fn: () => { window.saviaOpen('terminal.html'); }, pages: ['index.html','particles.html','knowledge.html','globe.html','calendar.html'] },
+  navigate_knowledge:    { el: null, fn: () => { window.saviaOpen('knowledge.html'); }, pages: ['index.html','particles.html','terminal.html','globe.html','calendar.html'] },
+  navigate_globe:        { el: null, fn: () => { window.saviaOpen('globe.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','calendar.html'] },
+  navigate_calendar:     { el: null, fn: () => { window.saviaOpen('calendar.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html'] },
 
-  // ── System toggles ──
-  toggle_overclock:      { el: 'btn-overclock', fn: null, pages: ['index.html','terminal.html'] },
-  toggle_sound:          { el: 'btn-sound', fn: null, pages: ['index.html','terminal.html'] },
-  toggle_scanlines:      { el: 'btn-scanlines', fn: null, pages: ['index.html','terminal.html'] },
+  // ── System toggles (via API globali: niente più bottoni in sidebar) ──
+  toggle_overclock:      { el: null, fn: () => { window.saviaToggleOverclock && window.saviaToggleOverclock(); }, pages: ['index.html','terminal.html'] },
+  toggle_sound:          { el: null, fn: () => { window.saviaToggleSound && window.saviaToggleSound(); }, pages: ['index.html','terminal.html'] },
+  toggle_scanlines:      { el: null, fn: () => { window.saviaToggleScanlines && window.saviaToggleScanlines(); }, pages: ['index.html','terminal.html'] },
 
   // ── Voice controls ──
-  toggle_wake:           { el: 'vc-wake-toggle', fn: null, pages: ['index.html'] },
-  toggle_continuous:     { el: 'vc-continuous-toggle', fn: null, pages: ['index.html'] },
-  toggle_autospeak:      { el: 'btn-auto-speak', fn: null, pages: ['index.html'] },
+  toggle_wake:           { el: null, fn: () => { if (typeof toggleWake === 'function') toggleWake(); }, pages: ['index.html'] },
+  toggle_continuous:     { el: null, fn: () => { if (typeof toggleContinuous === 'function') toggleContinuous(); }, pages: ['index.html'] },
+  toggle_autospeak:      { el: null, fn: () => { window.saviaToggleAutoSpeak && window.saviaToggleAutoSpeak(); }, pages: ['index.html'] },
 
   // ── Globe controls ──
   toggle_globe_rotate:   { el: 'btn-globe-rotate', fn: null, pages: ['globe.html'] },
@@ -69,36 +56,20 @@ const ACTION_MAP = {
   particles_gesture_delete: { el: 'btn-gesture-delete', fn: null, pages: ['particles.html'] },
   particles_gesture_move:   { el: 'btn-gesture-move', fn: null, pages: ['particles.html'] },
 
-  // ── Terminal controls ──
-  terminal_clear:        { el: 'term-clear', fn: null, pages: ['terminal.html'] },
-  terminal_kill:         { el: 'term-kill', fn: null, pages: ['terminal.html'] },
-  fb_refresh:            { el: 'fb-refresh', fn: null, pages: ['terminal.html'] },
-  fb_back:               { el: 'fb-back', fn: null, pages: ['terminal.html'] },
-  fb_forward:            { el: 'fb-forward', fn: null, pages: ['terminal.html'] },
-  fb_up:                 { el: 'fb-up', fn: null, pages: ['terminal.html'] },
-
   // ── Knowledge base ──
   kb_index:              { el: 'kb-index-btn', fn: null, pages: ['knowledge.html'] },
 
   // ── Memory ──
   memory_scan_projects:  { el: 'mem-scan-btn', fn: null, pages: ['index.html'] },
 
-  // ── YouTube ──
-  navigate_youtube:      { el: null, fn: () => { window.saviaOpen('youtube.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html'] },
-  navigate_face_training:{ el: null, fn: () => { window.saviaOpen('face-training.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
-  navigate_hotline:      { el: null, fn: () => { window.saviaOpen('hotline.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
-  navigate_proximity:    { el: null, fn: () => { window.saviaOpen('proximity.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
-  navigate_mcp:          { el: null, fn: () => { window.saviaOpen('mcp.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html'] },
-  navigate_news:         { el: null, fn: () => { window.saviaOpen('news.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html','face-training.html','hotline.html','proximity.html','mcp.html'] },
-  navigate_stats:        { el: null, fn: () => { window.saviaOpen('stats.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','objectives.html','imagine.html','calendar.html','youtube.html','face-training.html','hotline.html','proximity.html','mcp.html','news.html'] },
-  yt_search:             { el: null, fn: () => sendYtCommand('search'), pages: YT_CONTROL_PAGES },
-  yt_playlist_add:       { el: null, fn: () => sendYtCommand('playlist_add'), pages: YT_CONTROL_PAGES },
-  yt_playlist_remove:    { el: null, fn: () => sendYtCommand('playlist_remove'), pages: YT_CONTROL_PAGES },
-  yt_subscribe:          { el: null, fn: () => sendYtCommand('subscribe'), pages: YT_CONTROL_PAGES },
-  yt_analyze:            { el: null, fn: () => sendYtCommand('analyze'), pages: YT_CONTROL_PAGES },
-
+  navigate_face_training:{ el: null, fn: () => { window.saviaOpen('face-training.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
+  navigate_hotline:      { el: null, fn: () => { window.saviaOpen('hotline.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
+  navigate_proximity:    { el: null, fn: () => { window.saviaOpen('proximity.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
+  navigate_mcp:          { el: null, fn: () => { window.saviaOpen('mcp.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html'] },
+  navigate_news:         { el: null, fn: () => { window.saviaOpen('news.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html','face-training.html','hotline.html','proximity.html','mcp.html'] },
+  navigate_stats:        { el: null, fn: () => { window.saviaOpen('stats.html'); }, pages: ['index.html','particles.html','terminal.html','knowledge.html','globe.html','calendar.html','face-training.html','hotline.html','proximity.html','mcp.html','news.html'] },
   // ── Logs ──
-  open_logs:             { el: 'system-logs-ticker', fn: null, pages: ['index.html','particles.html','terminal.html','globe.html','knowledge.html','youtube.html','objectives.html'] },
+  open_logs:             { el: 'system-logs-ticker', fn: null, pages: ['index.html','particles.html','terminal.html','globe.html','knowledge.html'] },
 
   // ── Messaging ──
   send_whatsapp: { el: null, fn: () => {
@@ -109,7 +80,7 @@ const ACTION_MAP = {
     if (typeof executeAction === 'function') {
       executeAction({ type: 'whatsapp', phone, message });
     }
-  }, pages: YT_CONTROL_PAGES },
+  }, pages: MSG_PAGES },
   send_sms: { el: null, fn: () => {
     const payload = cleanActionPayload(actionPayload);
     const parts = payload.match(/^(.+?)\s+[-:]\s*(.+)$/s);
@@ -118,7 +89,7 @@ const ACTION_MAP = {
     if (typeof executeAction === 'function') {
       executeAction({ type: 'sms', phone, message });
     }
-  }, pages: YT_CONTROL_PAGES },
+  }, pages: MSG_PAGES },
 };
 
 function executeConfigAction(actionId, sourcePage) {
@@ -163,10 +134,6 @@ const ACTION_KEYWORDS = {
   'vai al globo': 'navigate_globe',
   'apri il globo': 'navigate_globe',
   'vai al global timeline': 'navigate_globe',
-  'vai agli obiettivi': 'navigate_objectives',
-  'apri obiettivi': 'navigate_objectives',
-  'vai a objectives hub': 'navigate_objectives',
-  'vai agli objectives': 'navigate_objectives',
   'vai al calendario': 'navigate_calendar',
   'apri calendario': 'navigate_calendar',
   'vai a calendar': 'navigate_calendar',
@@ -196,10 +163,6 @@ const ACTION_KEYWORDS = {
   'ultime notizie': 'navigate_news',
   'notizie tech': 'navigate_news',
   'notizie ai': 'navigate_news',
-  'vai a imagine': 'navigate_imagine',
-  'vai alla generazione immagini': 'navigate_imagine',
-  'apri imagine': 'navigate_imagine',
-  'genera immagine': 'navigate_imagine',
 
   // Stats
   'vai alle statistiche': 'navigate_stats',
@@ -261,43 +224,10 @@ const ACTION_KEYWORDS = {
   'modalita elimina': 'particles_gesture_delete',
   'modalita sposta': 'particles_gesture_move',
 
-  // Terminal
-  'pulisci terminale': 'terminal_clear',
-  'cancella terminale': 'terminal_clear',
-  'termina processo': 'terminal_kill',
-  'kill': 'terminal_kill',
-  'aggiorna file': 'fb_refresh',
-  'ricarica file': 'fb_refresh',
-  'torna indietro': 'fb_back',
-  'vai avanti': 'fb_forward',
-  'sali directory': 'fb_up',
-  'directory superiore': 'fb_up',
-
   // Knowledge base
   'indicizza directory': 'kb_index',
   'scansiona directory': 'kb_index',
   'aggiungi documenti': 'kb_index',
-
-  // YouTube — azioni (il testo finale del comando viaggia come payload)
-  'vai su youtube': 'navigate_youtube',
-  'apri youtube': 'navigate_youtube',
-  'vai al controllo youtube': 'navigate_youtube',
-  'cerca video su youtube': 'yt_search',
-  'cerca su youtube': 'yt_search',
-  'cerca video': 'yt_search',
-  'aggiungi alla playlist': 'yt_playlist_add',
-  'aggiungi a playlist': 'yt_playlist_add',
-  'salva in playlist': 'yt_playlist_add',
-  'rimuovi dalla playlist': 'yt_playlist_remove',
-  'rimuovi da playlist': 'yt_playlist_remove',
-  'iscriviti al canale youtube': 'yt_subscribe',
-  'iscriviti al canale': 'yt_subscribe',
-  'iscriviti a': 'yt_subscribe',
-  'iscriviti': 'yt_subscribe',
-  'analizza il canale': 'yt_analyze',
-  'analizza canale': 'yt_analyze',
-  'analisi del canale': 'yt_analyze',
-  'analisi canale': 'yt_analyze',
 
   // Memory
   'scansiona progetti': 'memory_scan_projects',

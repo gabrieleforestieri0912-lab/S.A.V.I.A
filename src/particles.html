@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="lib/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
@@ -28,11 +28,11 @@
     </div>
 
     <div class="header-center">
-      <span class="breadcrumb">SYSTEM_ROOT // NEURAL_PARTICLES // 3D_SCENE_CREATOR</span>
+      <span class="breadcrumb">Savia · Particelle</span>
     </div>
 
     <div class="header-right">
-      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> BACK TO CHAT</button>
+      <button class="hud-action-btn-primary" onclick="window.location.href='index.html'" style="font-size:9px;padding:4px 10px;margin-right:10px;"><i class="fas fa-comment-dots"></i> Chat</button>
       <div class="window-controls">
         <button class="win-btn" id="btn-minimize" title="Minimize">&#9472;</button>
         <button class="win-btn" id="btn-maximize" title="Maximize">&#9633;</button>
@@ -46,71 +46,62 @@
     <aside id="left-sidebar">
       <div class="nav-rail-header">
         <div class="nav-rail-logo"><i class="fas fa-brain"></i></div>
-        <span class="nav-rail-title">S.A.V.I.A NAV</span>
+        <span class="nav-rail-title">Savia</span>
       </div>
       <div class="nav-rail-items">
-        <div class="nav-rail-section-label">CORE</div>
+        <div class="nav-rail-section-label">Principale</div>
         <div class="nav-rail-item" onclick="window.location.href='index.html'">
           <div class="nav-icon"><i class="fas fa-terminal"></i></div>
-          <div class="nav-label"><span class="nav-label-main">COGNITIVE_TERMINAL</span><span class="nav-label-sub">AI Chat HUD</span></div>
+          <div class="nav-label"><span class="nav-label-main">Chat</span><span class="nav-label-sub">AI Chat HUD</span></div>
         </div>
         <div class="nav-rail-item" onclick="window.location.href='terminal.html'">
           <div class="nav-icon"><i class="fas fa-folder-open"></i></div>
-          <div class="nav-label"><span class="nav-label-main">COMMAND_CENTER</span><span class="nav-label-sub">File Explorer &amp; Terminal</span></div>
+          <div class="nav-label"><span class="nav-label-main">Terminale</span><span class="nav-label-sub">File Explorer &amp; Terminal</span></div>
         </div>
         <div class="nav-rail-divider"></div>
-        <div class="nav-rail-section-label">MODULES</div>
+        <div class="nav-rail-section-label">Moduli</div>
         <div class="nav-rail-item" onclick="window.location.href='calendar.html'">
           <div class="nav-icon"><i class="fas fa-calendar-alt"></i></div>
-          <div class="nav-label"><span class="nav-label-main">CALENDAR</span><span class="nav-label-sub">Events &amp; Schedule</span></div>
+          <div class="nav-label"><span class="nav-label-main">Calendario</span><span class="nav-label-sub">Events &amp; Schedule</span></div>
         </div>
-        <div class="nav-rail-item" onclick="window.location.href='objectives.html'">
-          <div class="nav-icon"><i class="fas fa-bullseye"></i></div>
-          <div class="nav-label"><span class="nav-label-main">OBJECTIVES_HUB</span><span class="nav-label-sub">Goals &amp; Daily Log</span></div>
-        </div>
-        <div class="nav-rail-item" onclick="window.location.href='imagine.html'">
-          <div class="nav-icon"><i class="fas fa-palette"></i></div>
-          <div class="nav-label"><span class="nav-label-main">AI_IMAGINE</span><span class="nav-label-sub">Text to Image</span></div>
-        </div>
+        
+        
         <div class="nav-rail-item active">
           <div class="nav-icon"><i class="fas fa-atom"></i></div>
-          <div class="nav-label"><span class="nav-label-main">NEURAL_PARTICLES</span><span class="nav-label-sub">3D Scene Creator</span></div>
+          <div class="nav-label"><span class="nav-label-main">Particelle</span><span class="nav-label-sub">3D Scene Creator</span></div>
         </div>
         <div class="nav-rail-item" onclick="window.location.href='globe.html'">
           <div class="nav-icon"><i class="fas fa-globe"></i></div>
-          <div class="nav-label"><span class="nav-label-main">GLOBAL_TIMELINE</span><span class="nav-label-sub">World Time &amp; Weather</span></div>
+          <div class="nav-label"><span class="nav-label-main">Mondo</span><span class="nav-label-sub">World Time &amp; Weather</span></div>
         </div>
         <div class="nav-rail-item" onclick="window.location.href='knowledge.html'">
           <div class="nav-icon"><i class="fas fa-database"></i></div>
-          <div class="nav-label"><span class="nav-label-main">KNOWLEDGE_BASE</span><span class="nav-label-sub">RAG Document Store</span></div>
+          <div class="nav-label"><span class="nav-label-main">Conoscenza</span><span class="nav-label-sub">RAG Document Store</span></div>
         </div>
         <div class="nav-rail-item" onclick="window.location.href='mcp.html'">
           <div class="nav-icon"><i class="fas fa-plug"></i></div>
-          <div class="nav-label"><span class="nav-label-main">MCP_SERVERS</span><span class="nav-label-sub">Connect Any App</span></div>
+          <div class="nav-label"><span class="nav-label-main">Server MCP</span><span class="nav-label-sub">Connect Any App</span></div>
         </div>
-        <div class="nav-rail-item" onclick="window.location.href='youtube.html'">
-          <div class="nav-icon"><i class="fab fa-youtube"></i></div>
-          <div class="nav-label"><span class="nav-label-main">YOUTUBE_CONTROL</span><span class="nav-label-sub">Video Search &amp; Filter</span></div>
-        </div>
+        
         <div class="nav-rail-item" onclick="window.location.href='news.html'">
           <div class="nav-icon"><i class="fas fa-newspaper"></i></div>
-          <div class="nav-label"><span class="nav-label-main">NEWS_FEED</span><span class="nav-label-sub">Tech &amp; AI Monitor</span></div>
+          <div class="nav-label"><span class="nav-label-main">Notizie</span><span class="nav-label-sub">Tech &amp; AI Monitor</span></div>
         </div>
         <div class="nav-rail-divider"></div>
-        <div class="nav-rail-section-label">COMM</div>
+        <div class="nav-rail-section-label">Telefono</div>
         <div class="nav-rail-item" onclick="window.location.href='hotline.html'">
           <div class="nav-icon"><i class="fas fa-phone"></i></div>
-          <div class="nav-label"><span class="nav-label-main">CALL_HOTLINE</span><span class="nav-label-sub">Telefono → AI</span></div>
+          <div class="nav-label"><span class="nav-label-main">Hotline</span><span class="nav-label-sub">Telefono → AI</span></div>
         </div>
         <div class="nav-rail-item" onclick="window.location.href='proximity.html'">
           <div class="nav-icon"><i class="fas fa-broadcast-tower"></i></div>
-          <div class="nav-label"><span class="nav-label-main">PROXIMITY_NEARBY</span><span class="nav-label-sub">BLE & Auto-Unlock</span></div>
+          <div class="nav-label"><span class="nav-label-main">Prossimità</span><span class="nav-label-sub">BLE & Auto-Unlock</span></div>
         </div>
       </div>
       <div class="nav-rail-footer">
         <div class="nav-rail-item" style="opacity:0.4;cursor:default;">
           <div class="nav-icon"><i class="fas fa-shield-alt"></i></div>
-          <div class="nav-label"><span class="nav-label-main">SECURE SHELL</span><span class="nav-label-sub">127.0.0.1</span></div>
+          <div class="nav-label"><span class="nav-label-main">Locale</span><span class="nav-label-sub">127.0.0.1</span></div>
         </div>
       </div>
     </aside>
@@ -152,16 +143,16 @@
     </section>
 
     <aside id="right-sidebar" class="hud-panel">
-      <div class="sidebar-subview" style="padding: 15px; border-bottom: 1px solid rgba(0, 243, 255, 0.1); text-align: center;">
+      <div class="sidebar-subview" style="padding: 15px; border-bottom: 1px solid rgba(255, 171, 46, 0.1); text-align: center;">
         <div class="panel-header" style="border: none; padding: 0 0 5px 0; justify-content: center;">
-          <h2 style="font-size: 11px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.4); text-transform: uppercase;">REALTIME_LIVE_CLOCK</h2>
+          <h2 style="font-size: 11px; letter-spacing: 1px; color: rgba(255, 255, 255, 0.4);">Ora locale</h2>
         </div>
         <div id="clock-display">00:00:00</div>
       </div>
 
       <div id="sidebar-particles-container" class="sidebar-subview flex-grow-column">
         <div class="panel-header">
-          <h2>SCENE_CONTROLS</h2>
+          <h2>Scena</h2>
           <span class="sub-header-telemetry">DIAG: CALIBRATING</span>
         </div>
 
@@ -283,12 +274,12 @@
 
           <div class="telemetry-card">
             <div class="card-header"><span>BASE CORE COLOR</span></div>
-            <input type="color" id="baseColor" value="#9d4edd" class="hud-color-picker">
+            <input type="color" id="baseColor" value="#ff7a1a" class="hud-color-picker">
           </div>
 
           <div class="telemetry-card">
             <div class="card-header"><span>ACCENT WAVE COLOR</span></div>
-            <input type="color" id="accentColor" value="#00f3ff" class="hud-color-picker">
+            <input type="color" id="accentColor" value="#ffab2e" class="hud-color-picker">
           </div>
 
           <!-- CREATION MODE -->
@@ -364,15 +355,15 @@
 
   <div id="hud-scanlines"></div>
 
-  <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
-  <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="auto"></audio>
+  <audio id="audio-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="none"></audio>
+  <audio id="audio-beep" src="https://assets.mixkit.co/active_storage/sfx/951/951-84.wav" preload="none"></audio>
 
   <div id="logs-modal" class="hidden-modal">
     <div id="logs-modal-content" class="hud-panel-flat">
       <header class="modal-header">
         <div class="modal-title-left">
           <span class="system-status-indicator blink"></span>
-          <span class="modal-title-text">SYSTEM_LOGS_CONSOLE</span>
+          <span class="modal-title-text">Log</span>
         </div>
         <div class="modal-header-right">
           <span id="modal-clock">00:00:00</span>
@@ -412,6 +403,7 @@
 
   <script src="shared.js"></script>
   <script src="particles.js"></script>
+  <script src="stt-local.js"></script>
   <script src="page-voice.js"></script>
   <script src="nav-windows.js"></script>
 </body>

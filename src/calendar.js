@@ -1,9 +1,6 @@
 /**
- * S.A.V.I.A - Calendar (Month View + Notion Events)
+ * S.A.V.I.A - Calendar (Month View, eventi locali)
  */
-
-// Notion è raggiunto tramite un server MCP (es. @notionhq/notion-mcp-server).
-let calNotionDb = localStorage.getItem('calendar-notion-db') || '';
 
 let calDate = new Date();
 let calEvents = [];
@@ -27,21 +24,8 @@ const eventAdd = document.getElementById('cal-event-add');
 const eventClose = document.getElementById('cal-event-close');
 const calStatCount = document.getElementById('cal-stat-count');
 const calStatMonth = document.getElementById('cal-stat-month');
-const calServerSelect = document.getElementById('cal-notion-server');
-const calDbInput = document.getElementById('cal-notion-db');
-const calSaveBtn = document.getElementById('cal-notion-save');
 
 let selectedDay = null;
-
-// ── Notion (via MCP) ──
-
-async function notionQueryDatabase(databaseId, filter) {
-  return SaviaNotionMCP.queryDatabase(databaseId, filter);
-}
-
-async function notionCreatePage(databaseId, properties) {
-  return SaviaNotionMCP.createPage(databaseId, properties);
-}
 
 // ── Calendar Logic ──
 
@@ -150,47 +134,6 @@ async function addCalendarEvent() {
   renderDayEvents(selectedDay);
   eventInput.value = '';
   if (eventTime) eventTime.value = '';
-
-  if (calNotionDb) {
-    try {
-      const props = {
-        Name: { title: [{ text: { content: text } }] },
-        Date: { date: { start: selectedDay } }
-      };
-      await notionCreatePage(calNotionDb, props);
-    } catch (e) {
-      addCalLog(`Notion sync fallito: ${e.message}`);
-    }
-  }
-}
-
-async function syncFromNotion() {
-  if (!calNotionDb) return;
-  SaviaNotionMCP.setServerId(calServerSelect?.value?.trim() || '');
-  try {
-    const data = await notionQueryDatabase(calNotionDb);
-    const notionEvents = data.results.map(p => {
-      const props = p.properties;
-      const date = props.Date?.date?.start || '';
-      return {
-        id: p.id,
-        title: props.Name?.title?.[0]?.text?.content || 'Untitled',
-        date: date.split('T')[0],
-        time: date.includes('T') ? date.split('T')[1]?.substring(0, 5) : ''
-      };
-    });
-    // Merge: keep local-only UI events not present in Notion results
-    const notionIds = new Set(notionEvents.map(e => String(e.id)));
-    const localOnly = calEvents.filter(e => !notionIds.has(String(e.id)));
-    calEvents = [...localOnly, ...notionEvents];
-    persistCalEvents();
-    syncCalendarToMain();
-    renderCalendar();
-    if (selectedDay) renderDayEvents(selectedDay);
-    addCalLog(`Sincronizzati ${notionEvents.length} eventi da Notion (${localOnly.length} locali mantenuti).`);
-  } catch (e) {
-    addCalLog(`Sync Notion fallito: ${e.message}`);
-  }
 }
 
 function deleteCalendarEvent(id) {
@@ -201,41 +144,6 @@ function deleteCalendarEvent(id) {
   renderCalendar();
   renderDayEvents(selectedDay);
   addCalLog('Evento eliminato.');
-}
-
-// ── Config (via MCP) ──
-
-async function refreshCalServers() {
-  if (!calServerSelect) return;
-  const servers = await SaviaNotionMCP.listServers();
-  const prev = calServerSelect.value;
-  calServerSelect.innerHTML = '';
-  const auto = document.createElement('option');
-  auto.value = '';
-  auto.textContent = '— auto-detect (server con tool notion_*) —';
-  calServerSelect.appendChild(auto);
-  for (const s of servers) {
-    const o = document.createElement('option');
-    o.value = s.id;
-    o.textContent = `${s.name} [${s.status === 'on' ? 'ON' : s.status}]`;
-    calServerSelect.appendChild(o);
-  }
-  const selected = localStorage.getItem('notion-mcp-server-id') || (await SaviaNotionMCP.resolveServerId()) || prev;
-  calServerSelect.value = selected || '';
-}
-
-async function loadCalConfig() {
-  calNotionDb = localStorage.getItem('calendar-notion-db') || '';
-  await refreshCalServers();
-  if (calDbInput) calDbInput.value = calNotionDb;
-}
-
-async function saveCalConfig() {
-  calNotionDb = calDbInput?.value?.trim() || '';
-  localStorage.setItem('calendar-notion-db', calNotionDb);
-  SaviaNotionMCP.setServerId(calServerSelect?.value?.trim() || '');
-  addCalLog('Configurazione salvata.');
-  syncFromNotion();
 }
 
 function addCalLog(msg) {
@@ -297,7 +205,6 @@ if (todayBtn) todayBtn.addEventListener('click', goToday);
 if (eventClose) eventClose.addEventListener('click', () => eventPanel?.classList.add('hidden'));
 if (eventAdd) eventAdd.addEventListener('click', addCalendarEvent);
 if (eventInput) eventInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); eventAdd?.click(); } });
-if (calSaveBtn) calSaveBtn.addEventListener('click', saveCalConfig);
 
 function openEditor() {
   if (window.electronAPI?.openEditor) {
@@ -308,9 +215,7 @@ function openEditor() {
 // ── Init ──
 
 document.addEventListener('DOMContentLoaded', () => {
-  loadCalConfig();
   renderCalendar();
   syncCalendarToMain();
   loadAgentCalendarEvents();
-  if (calNotionDb) setTimeout(syncFromNotion, 1000);
 });

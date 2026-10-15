@@ -82,12 +82,12 @@ function drawDetection(det, displaySize) {
   const bwidth = (box.width / 640) * w;
   const bheight = (box.height / 640) * h;
 
-  canvasCtx.strokeStyle = 'rgba(0, 243, 255, 0.35)';
+  canvasCtx.strokeStyle = 'rgba(255, 171, 46, 0.35)';
   canvasCtx.lineWidth = 1;
   canvasCtx.strokeRect(bx, by, bwidth, bheight);
 
   const cornerLen = Math.min(bwidth * 0.2, 24);
-  canvasCtx.strokeStyle = 'rgba(0, 243, 255, 0.75)';
+  canvasCtx.strokeStyle = 'rgba(255, 171, 46, 0.75)';
   canvasCtx.lineWidth = 2;
   canvasCtx.beginPath();
   canvasCtx.moveTo(bx, by + cornerLen); canvasCtx.lineTo(bx, by); canvasCtx.lineTo(bx + cornerLen, by);
@@ -98,7 +98,7 @@ function drawDetection(det, displaySize) {
 
   if (det.landmarks) {
     const points = det.landmarks.positions;
-    canvasCtx.fillStyle = 'rgba(0, 243, 255, 0.5)';
+    canvasCtx.fillStyle = 'rgba(255, 171, 46, 0.5)';
     for (let i = 0; i < points.length; i++) {
       canvasCtx.beginPath();
       canvasCtx.arc((points[i].x / 640) * w, (points[i].y / 480) * h, 1.5, 0, Math.PI * 2);

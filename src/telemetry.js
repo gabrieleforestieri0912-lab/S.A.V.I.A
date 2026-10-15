@@ -6,6 +6,8 @@ window.telemetryData = {};
 
 function applyRealTelemetry(data) {
   window.telemetryData = data;
+  // La pagina terminale non ha le card: esci senza errori
+  if (typeof fillCpu === 'undefined' || !fillCpu || !txtCpuLoad) return;
   const cpuVal = Math.min(100, data.cpu);
   fillCpu.style.width = `${cpuVal}%`;
   txtCpuLoad.textContent = `${cpuVal}%`;
@@ -80,46 +82,77 @@ if (window.electronAPI && window.electronAPI.onTelemetryUpdate) {
 }
 
 // ── Controls Toggles ─────────────────────────────────────────────────
-
-document.getElementById('btn-overclock').addEventListener('click', function() {
-  playAudio(audioClick);
+// (bottoni rimossi dalla sidebar: restano via voce/chat + API globali)
+function saviaToggleOverclock() {
   overclockEnabled = !overclockEnabled;
-  this.classList.toggle('active', overclockEnabled);
-
-  const indicator = this.querySelector('.indicator');
+  const btn = document.getElementById('btn-overclock');
+  if (btn) {
+    btn.classList.toggle('active', overclockEnabled);
+    const indicator = btn.querySelector('.indicator');
+    if (indicator) {
+      indicator.style.background = overclockEnabled ? '#00ff88' : '#555';
+      indicator.style.boxShadow = overclockEnabled ? '0 0 6px #00ff88' : 'none';
+    }
+  }
   if (overclockEnabled) {
-    indicator.style.background = '#00ff88';
-    indicator.style.boxShadow = '0 0 6px #00ff88';
     if (ringSegmented) ringSegmented.style.animationDuration = '4s';
     if (ringInner) ringInner.style.animationDuration = '2s';
-    addTickerEvent("[SYS] COGNITIVE OVERCLOCK ACTIVATED. Freq boosted to 4.20GHz.");
+    addTickerEvent('sys', 'Overclock attivo.');
   } else {
-    indicator.style.background = '#555';
-    indicator.style.boxShadow = 'none';
     if (ringSegmented) ringSegmented.style.animationDuration = '12s';
     if (ringInner) ringInner.style.animationDuration = '8s';
-    addTickerEvent("[SYS] Overclock disabled. Reverting to base power profile.");
+    addTickerEvent('sys', 'Overclock disattivato.');
   }
-});
+  return overclockEnabled;
+}
 
-document.getElementById('btn-sound').addEventListener('click', function() {
+function saviaToggleSound() {
   soundEnabled = !soundEnabled;
-  this.classList.toggle('active', soundEnabled);
-  const indicator = this.querySelector('.indicator');
-  indicator.style.background = soundEnabled ? '#00ff88' : '#555';
-  indicator.style.boxShadow = soundEnabled ? '0 0 6px #00ff88' : 'none';
-  if (soundEnabled) playAudio(audioClick);
-});
+  const btn = document.getElementById('btn-sound');
+  if (btn) {
+    btn.classList.toggle('active', soundEnabled);
+    const indicator = btn.querySelector('.indicator');
+    if (indicator) {
+      indicator.style.background = soundEnabled ? '#00ff88' : '#555';
+      indicator.style.boxShadow = soundEnabled ? '0 0 6px #00ff88' : 'none';
+    }
+  }
+  if (soundEnabled && typeof playAudio === 'function' && typeof audioClick !== 'undefined') playAudio(audioClick);
+  return soundEnabled;
+}
 
-const scanlinesEl = document.getElementById('hud-scanlines');
-document.getElementById('btn-scanlines').addEventListener('click', function() {
-  playAudio(audioClick);
+function saviaToggleScanlines() {
   scanlinesEnabled = !scanlinesEnabled;
-  this.classList.toggle('active', scanlinesEnabled);
-  const indicator = this.querySelector('.indicator');
-  indicator.style.background = scanlinesEnabled ? '#00ff88' : '#555';
-  indicator.style.boxShadow = scanlinesEnabled ? '0 0 6px #00ff88' : 'none';
+  const btn = document.getElementById('btn-scanlines');
+  if (btn) {
+    btn.classList.toggle('active', scanlinesEnabled);
+    const indicator = btn.querySelector('.indicator');
+    if (indicator) {
+      indicator.style.background = scanlinesEnabled ? '#00ff88' : '#555';
+      indicator.style.boxShadow = scanlinesEnabled ? '0 0 6px #00ff88' : 'none';
+    }
+  }
+  const scanlinesEl = document.getElementById('hud-scanlines');
+  if (scanlinesEl) {
+    if (scanlinesEnabled) scanlinesEl.classList.remove('disabled');
+    else scanlinesEl.classList.add('disabled');
+  }
+  return scanlinesEnabled;
+}
 
-  if (scanlinesEnabled) scanlinesEl.classList.remove('disabled');
-  else scanlinesEl.classList.add('disabled');
-});
+window.saviaToggleOverclock = saviaToggleOverclock;
+window.saviaToggleSound = saviaToggleSound;
+window.saviaToggleScanlines = saviaToggleScanlines;
+
+(function bindLegacyToggleButtons() {
+  const wire = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', function() {
+      if (typeof playAudio === 'function' && typeof audioClick !== 'undefined') playAudio(audioClick);
+      fn();
+    });
+  };
+  wire('btn-overclock', saviaToggleOverclock);
+  wire('btn-sound', saviaToggleSound);
+  wire('btn-scanlines', saviaToggleScanlines);
+})();

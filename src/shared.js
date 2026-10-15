@@ -2,9 +2,12 @@ let soundEnabled = true;
 let overclockEnabled = true;
 let scanlinesEnabled = true;
 let aiOnline = false;
-let aiProvider = 'openrouter'; // solo OpenRouter
-let openrouterApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
-let openrouterBaseUrl = 'https://openrouter.ai/api/v1';
+let aiProvider = 'xkiro'; // provider AI: xKiro (https://api.xkiro.com/v1, OpenAI-compatible)
+let xkiroApiKey = ''; // caricato da savia-config.json via configGet (mai hardcodare)
+let xkiroBaseUrl = 'https://api.xkiro.com/v1';
+// Alias retrocompatibilità (vecchio nome OpenRouter → ora xKiro)
+let openrouterApiKey = '';
+let openrouterBaseUrl = 'https://api.xkiro.com/v1';
 let systemLogsBuffer = [];
 
 const audioClick = document.getElementById('audio-click');
@@ -400,23 +403,19 @@ if (window.electronAPI && window.electronAPI.onReminderFired) {
 
 const NAV_HISTORY = [];
 const NAV_PAGES = {
-  'index.html':       { title: 'TERMINALE_COGNITIVO', section: 'view-terminal', icon: 'fa-brain' },
-  'dashboard':        { title: 'CRUSCOTTO',          section: 'view-dashboard', icon: 'fa-gauge-high' },
-  'editor':           { title: 'EDITOR_CODICE',      section: 'view-editor',    icon: 'fa-code' },
-  'calendar.html':    { title: 'CALENDARIO',         external: true },
-  'objectives.html':  { title: 'HUB_OBIETTIVI',      external: true },
-  'imagine.html':     { title: 'AI_IMMAGINA',        external: true },
-  'particles.html':   { title: 'PARTICELLE_NERALI',  external: true },
-  'terminal.html':    { title: 'CENTRO_COMANDI',     external: true },
-  'globe.html':       { title: 'LINEA_TEMPORALE',    external: true },
-  'knowledge.html':   { title: 'BASE_CONOSCENZA',    external: true },
-  'youtube.html':     { title: 'CONTROLLO_YOUTUBE',  external: true },
-  'mcp.html':         { title: 'MCP_SERVERS',        external: true },
+  'index.html':       { title: 'Chat', section: 'view-terminal', icon: 'fa-brain' },
+  'editor':           { title: 'Editor', section: 'view-editor', icon: 'fa-code' },
+  'calendar.html':    { title: 'Calendario', external: true },
+  'particles.html':   { title: 'Particelle', external: true },
+  'terminal.html':    { title: 'Terminale', external: true },
+  'globe.html':       { title: 'Mondo', external: true },
+  'knowledge.html':   { title: 'Conoscenza', external: true },
+  'mcp.html':         { title: 'Server MCP', external: true },
 };
 
 // True quando la pagina corrente vive in una finestra-strumento dedicata
 // (in tal caso "index.html" deve riportare al centro di comando, non cambiare vista)
-const IS_TOOL_WINDOW = /(?:terminal|calendar|objectives|imagine|particles|globe|knowledge|youtube|hotline|proximity|face-training|mcp)\.html$/.test(location.pathname);
+const IS_TOOL_WINDOW = /(?:terminal|calendar|particles|globe|knowledge|hotline|proximity|face-training|mcp)\.html$/.test(location.pathname);
 
 let navReady = false;
 let currentNavPage = null;
@@ -463,9 +462,6 @@ function navigateTo(pageId, params = null, pushHistory = true) {
     updateBreadcrumb(page);
     updateClockTitle(page.title);
 
-    if (pageId === 'dashboard') startDashboard();
-    else stopDashboard();
-
     if (pageId === 'editor') {
       setTimeout(() => initEditor && initEditor(), 80);
     }
@@ -480,11 +476,10 @@ function navigateTo(pageId, params = null, pushHistory = true) {
 function updateSidebarActive(pageId) {
   const map = {
     'index.html': ['proj-saviacore'],
-    'dashboard':  ['nav-dashboard'],
     'editor':     ['nav-editor'],
-    'calendar.html': [], 'objectives.html': [], 'imagine.html': [],
+    'calendar.html': [],
     'particles.html': [], 'terminal.html': [], 'globe.html': [],
-    'knowledge.html': [], 'youtube.html': [],
+    'knowledge.html': [],
   };
   const ids = map[pageId] || [];
   document.querySelectorAll('#left-sidebar .nav-rail-item').forEach(function(el) {
@@ -501,12 +496,12 @@ function updateSidebarActive(pageId) {
 
 function updateBreadcrumb(page) {
   const el = document.querySelector('.breadcrumb');
-  if (el) el.textContent = 'SISTEMA_ROOT // ' + page.title;
+  if (el) el.textContent = 'Savia · ' + page.title;
 }
 
 function updateClockTitle(title) {
   const el = document.querySelector('.header-center');
-  if (el && title) el.innerHTML = '<span class="breadcrumb">SISTEMA_ROOT // ' + title + '</span>';
+  if (el && title) el.innerHTML = '<span class="breadcrumb">Savia · ' + title + '</span>';
 }
 
 function goBack() {

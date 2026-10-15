@@ -156,24 +156,6 @@
     }
   }
 
-  function presetNotion() {
-    editingId = null;
-    $('inpName').value = 'Notion (ufficiale)';
-    $('selTransport').value = 'stdio';
-    $('chkAuto').checked = true;
-    $('inpCommand').value = 'npx';
-    $('inpArgs').value = '-y @notionhq/notion-mcp-server';
-    $('inpCwd').value = '';
-    $('inpEnv').value = '{ "OPENAPI_MCP_HEADERS": "{\\"Authorization\\": \\"Bearer <IL_TUO_TOKEN_NOTION>\\", \\"Notion-Version\\": \\"2022-06-28\\"}" }';
-    $('inpUrl').value = '';
-    $('inpHeaders').value = '';
-    $('btnCancelEdit').style.display = '';
-    $('editingHint').style.display = '';
-    toggleFields();
-    $('inpName').focus();
-    log('sys', 'Preset Notion caricato. Incolla il tuo token Bearer in OPENAPI_MCP_HEADERS, poi SALVA SERVER.');
-  }
-
   async function edit(id) {
     if (!api || !api.mcpStatus) return;
     const st = await mcpStatus();
@@ -252,7 +234,6 @@
   function bind() {
     $('btnSave').addEventListener('click', save);
     $('btnCancelEdit').addEventListener('click', cancelEdit);
-    $('btnPresetNotion').addEventListener('click', presetNotion);
     $('selTransport').addEventListener('change', toggleFields);
     if (api && api.onMcpEvent) api.onMcpEvent(() => refresh());
   }
